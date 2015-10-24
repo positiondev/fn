@@ -35,6 +35,9 @@ executable fn-example
                      , lens
                      , text
                      , http-types
+                     , heist
+                     , either
+                     , blaze-builder
   default-language:    Haskell2010
 
 test-suite fn-test

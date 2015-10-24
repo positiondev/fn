@@ -16,7 +16,9 @@ module Web.Fn ( RequestContext(..)
   ) where
 
 import           Data.List          (find)
+import           Data.Monoid        ((<>))
 import           Data.Text          (Text)
+import qualified Data.Text          as T
 import qualified Data.Text.Encoding as T
 import           Data.Text.Read     (decimal, double)
 import           Network.HTTP.Types
@@ -89,40 +91,55 @@ segment :: Param p => Req -> (p -> a) -> Maybe (Req, a)
 segment req k =
   case fst req of
     (x:xs) -> case fromParam x of
-                Nothing -> Nothing
-                Just p -> Just ((xs, snd req), k p)
+                Left _ -> Nothing
+                Right p -> Just ((xs, snd req), k p)
     _     -> Nothing
 
 class Param a where
-  fromParam :: Text -> Maybe a
+  fromParam :: Text -> Either Text a
 
 instance Param Text where
-  fromParam = Just
+  fromParam = Right
 instance Param Int where
   fromParam t = case decimal t of
-                  Left _ -> Nothing
-                  Right (_, x) | x /= "" -> Nothing
-                  Right (v, _) -> Just v
+                  Left msg -> Left (T.pack msg)
+                  Right m | snd m /= "" ->
+                            Left ("Incomplete match: " <> T.pack (show m))
+                  Right (v, _) -> Right v
 instance Param Double where
   fromParam t = case double t of
-                  Left _ -> Nothing
-                  Right (_, x) | x /= "" -> Nothing
-                  Right (v, _) -> Just v
+                  Left msg -> Left (T.pack msg)
+                  Right m | snd m /= "" ->
+                            Left ("Incomplete match: " <> T.pack (show m))
+                  Right (v, _) -> Right v
 
 param :: Param p => Text -> Req -> (p -> a) -> Maybe (Req, a)
 param n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
-  in case ((maybe "" T.decodeUtf8 . snd) <$> match) >>= fromParam of
+  in case ((maybe "" T.decodeUtf8 . snd) <$> match) of
        Nothing -> Nothing
-       Just p -> Just (req, k p)
+       Just p -> case fromParam p of
+         Left _ -> Nothing
+         Right p' -> Just (req, k p')
 
-paramOptional :: Param p => Text -> Req -> (Maybe p -> a) -> Maybe (Req, a)
+paramOptional :: Param p =>
+                 Text ->
+                 Req ->
+                 (Either Text p -> a) ->
+                 Maybe (Req, a)
 paramOptional n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
-      p = ((maybe "" T.decodeUtf8 . snd) <$> match) >>= fromParam
-  in Just (req, k p)
+      p = ((maybe "" T.decodeUtf8 . snd) <$> match)
+  in case p of
+       Nothing -> Just (req, k (Left "param missing"))
+       Just p' -> Just (req, k (fromParam p'))
 
-paramPresent :: Param p => Text -> Req -> (Maybe p -> a) -> Maybe (Req, a)
+
+paramPresent :: Param p =>
+                Text ->
+                Req ->
+                (Either Text p -> a) ->
+                Maybe (Req, a)
 paramPresent n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
       p = ((maybe "" T.decodeUtf8 . snd) <$> match)

@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+import           Data.Either
 import           Data.Maybe
 import           Data.Text          (Text)
 import           Network.HTTP.Types
@@ -108,33 +109,37 @@ main = hspec $ do
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
            (Req (["a"], []))
            `shouldSatisfy` isNothing
-    it "should always succeed with paramOptional" $
-      do paramOptional "id" ([], []) (== (Nothing :: Maybe Text))
+    it "should always pass a value with paramOptional" $
+      do paramOptional "id" ([], []) (isLeft :: Either Text Text -> Bool)
                        `shouldSatisfy` (snd . fromJust)
          paramOptional "id" ([], [("id", Just "foo")])
-                       (== Just ("foo" :: Text))
+                       (== Right ("foo" :: Text))
                        `shouldSatisfy` (snd . fromJust)
     it "should succeed if present, even if unparsable, w/ paramPresent" $
-      do paramPresent "id" ([], []) (== (Nothing :: Maybe Text))
+      do paramPresent "id" ([], []) (isLeft :: Either Text Text -> Bool)
                       `shouldSatisfy` isNothing
          paramPresent "id" ([], [("id", Just "foo")])
-                      (== Just ("foo" :: Text))
+                      (== Right ("foo" :: Text))
                       `shouldSatisfy` (snd . fromJust)
          paramPresent "id" ([], [("id", Just "foo")])
-                      (== (Nothing :: Maybe Int))
+                      (isLeft :: Either Text Int -> Bool)
                       `shouldSatisfy` (snd . fromJust)
 
 
   describe "parameter parsing" $
     do it "should parse Text" $
-         fromParam "hello" `shouldBe` Just ("hello" :: Text)
+         fromParam "hello" `shouldBe` Right ("hello" :: Text)
        it "should parse Int" $
-         do fromParam "1" `shouldBe` Just (1 :: Int)
-            fromParam "2011" `shouldBe` Just (2011 :: Int)
-            fromParam "aaa" `shouldBe` (Nothing :: Maybe Int)
-            fromParam "10a" `shouldBe` (Nothing :: Maybe Int)
+         do fromParam "1" `shouldBe` Right (1 :: Int)
+            fromParam "2011" `shouldBe` Right (2011 :: Int)
+            fromParam "aaa" `shouldSatisfy`
+              (isLeft :: Either Text Int -> Bool)
+            fromParam "10a" `shouldSatisfy`
+              (isLeft :: Either Text Int -> Bool)
        it "should be able to parse Double" $
-         do fromParam "1" `shouldBe` Just (1 :: Double)
-            fromParam "1.02" `shouldBe` Just (1.02 :: Double)
-            fromParam "thr" `shouldBe` (Nothing :: Maybe Double)
-            fromParam "100o" `shouldBe` (Nothing :: Maybe Double)
+         do fromParam "1" `shouldBe` Right (1 :: Double)
+            fromParam "1.02" `shouldBe` Right (1.02 :: Double)
+            fromParam "thr" `shouldSatisfy`
+              (isLeft :: Either Text Double -> Bool)
+            fromParam "100o" `shouldSatisfy`
+              (isLeft :: Either Text Double -> Bool)

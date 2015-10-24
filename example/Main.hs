@@ -4,6 +4,7 @@
 import           Control.Lens
 import           Data.Monoid
 import           Data.Text                (Text)
+import qualified Data.Text                as T
 import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Handler.Warp
@@ -29,8 +30,8 @@ app :: Ctxt -> IO Response
 app ctxt =
   route ctxt [path "foo" // segment // path "baz" /? param "id" ==> handler]
 
-handler :: Ctxt -> Text -> Text -> IO (Maybe Response)
+handler :: Ctxt -> Text -> Int -> IO (Maybe Response)
 handler _ fragment i =
   Just <$> W.text status200
                   []
-                  (fragment <> " - " <> i)
+                  (fragment <> " - " <> T.pack (show i))

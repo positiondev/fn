@@ -29,6 +29,7 @@ main = do context <- initializer
 app :: Ctxt -> IO Response
 app ctxt =
   route ctxt [path "foo" // segment // path "baz" /? param "id" ==> handler]
+    `fallthrough` return (responseLBS status404 [] "")
 
 handler :: Ctxt -> Text -> Int -> IO (Maybe Response)
 handler _ fragment i =

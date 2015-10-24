@@ -4,6 +4,7 @@
 module Web.Fn ( RequestContext(..)
               , toWAI
               , route
+              , fallthrough
               , (==>)
               , (//)
               , (/?)
@@ -44,11 +45,18 @@ toWAI :: RequestContext c => c -> (c -> IO Response) -> Application
 toWAI ctxt f req cont = let ctxt' = setRequest ctxt req
                         in f ctxt' >>= cont
 
+fallthrough :: IO (Maybe Response) -> IO Response -> IO Response
+fallthrough a ft =
+  do response <- a
+     case response of
+       Nothing -> ft
+       Just r -> return r
+
 route :: RequestContext c =>
          c ->
          [c -> Maybe (IO (Maybe Response))] ->
-         IO Response
-route _ [] = return $ responseLBS status404 [] ""
+         IO (Maybe Response)
+route _ [] = return Nothing
 route ctxt (x:xs) =
   case x ctxt of
     Nothing -> route ctxt xs
@@ -56,7 +64,7 @@ route ctxt (x:xs) =
       do resp <- action
          case resp of
            Nothing -> route ctxt xs
-           Just response -> return response
+           Just response -> return (Just response)
 
 type Req = ([Text], Query)
 

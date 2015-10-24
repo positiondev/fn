@@ -24,6 +24,7 @@ instance Functor (Store b) where
 
 class RequestContext c where
   requestLens :: Functor f => (Request -> f Request) -> c -> f c
+  requestLens f c = setRequest c <$> f (getRequest c)
   getRequest :: c -> Request
   getRequest c =
     let (Store r _) = requestLens (`Store` id) c
@@ -37,26 +38,32 @@ toWAI :: RequestContext c => c -> (c -> IO Response) -> Application
 toWAI ctxt f req cont = let ctxt' = setRequest ctxt req
                         in f ctxt' >>= cont
 
-route :: RequestContext c => c -> [c -> IO (Maybe Response)] -> IO Response
+route :: RequestContext c =>
+         c ->
+         [c -> Maybe (IO (Maybe Response))] ->
+         IO Response
 route _ [] = return $ responseLBS status404 [] ""
-route ctxt (x:xs) = do resp <- x ctxt
-                       case resp of
-                         Nothing -> route ctxt xs
-                         Just response -> return response
+route ctxt (x:xs) =
+  case x ctxt of
+    Nothing -> route ctxt xs
+    Just action ->
+      do resp <- action
+         case resp of
+           Nothing -> route ctxt xs
+           Just response -> return response
 
 type Req = ([Text], Query)
 
 (==>) :: RequestContext c =>
-         (Req -> t2 -> Maybe (Req, IO (Maybe t))) ->
+         (Req -> t2 -> Maybe (Req, a)) ->
          (c -> t2) ->
-         c ->
-         IO (Maybe t)
+         c -> Maybe a
 (match ==> handle) ctxt =
    let r = getRequest ctxt
        x = (pathInfo r, queryString r)
    in case match x (handle ctxt) of
-        Nothing -> return Nothing
-        Just (_, action) -> action
+        Nothing -> Nothing
+        Just (_, action) -> Just action
 
 
 (//) :: (c -> t -> Maybe (c, a')) ->

@@ -4,34 +4,33 @@
 import           Control.Lens
 import           Data.Monoid
 import           Data.Text                (Text)
-import qualified Data.Text.Lazy           as TL
-import qualified Data.Text.Lazy.Encoding  as TL
 import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Handler.Warp
+import qualified Network.Wai.Util         as W
 import           Web.Fn
 
-data App = App { _req :: Request
-               }
+data Ctxt = Ctxt { _req :: Request
+                 }
 
-makeLenses ''App
+makeLenses ''Ctxt
 
-instance RequestContext App where
+instance RequestContext Ctxt where
   requestLens = req
 
-initializer :: IO App
-initializer = return (App defaultRequest)
+initializer :: IO Ctxt
+initializer = return (Ctxt defaultRequest)
 
 main :: IO ()
 main = do context <- initializer
           run 8000 $ toWAI context app
 
-app :: App -> IO Response
+app :: Ctxt -> IO Response
 app ctxt =
-  route ctxt [text "foo" // fragment // text "baz" /? param "id" ==> handler]
+  route ctxt [path "foo" // segment // path "baz" /? param "id" ==> handler]
 
-handler :: App -> Text -> Text -> IO (Maybe Response)
-handler ctxt fragment i =
-  return $ Just $ responseLBS status200
-                              []
-                              (TL.encodeUtf8 $ TL.fromStrict $ fragment <> " - " <> i)
+handler :: Ctxt -> Text -> Text -> IO (Maybe Response)
+handler _ fragment i =
+  Just <$> W.text status200
+                  []
+                  (fragment <> " - " <> i)

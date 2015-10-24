@@ -9,12 +9,16 @@ module Web.Fn ( RequestContext(..)
               , (/?)
               , path
               , segment
+              , Param(..)
               , param
+              , paramOptional
+              , paramPresent
   ) where
 
 import           Data.List          (find)
 import           Data.Text          (Text)
 import qualified Data.Text.Encoding as T
+import           Data.Text.Read     (decimal, double)
 import           Network.HTTP.Types
 import           Network.Wai
 
@@ -81,18 +85,50 @@ type Req = ([Text], Query)
         t -> Maybe (c, a)
 (/?) = (//)
 
-segment :: Req -> (Text -> a) -> Maybe (Req, a)
+segment :: Param p => Req -> (p -> a) -> Maybe (Req, a)
 segment req k =
   case fst req of
-    (x:xs) -> Just ((xs, snd req), k x)
+    (x:xs) -> case fromParam x of
+                Nothing -> Nothing
+                Just p -> Just ((xs, snd req), k p)
     _     -> Nothing
 
-param :: Text -> Req -> (Text -> a) -> Maybe (Req, a)
+class Param a where
+  fromParam :: Text -> Maybe a
+
+instance Param Text where
+  fromParam = Just
+instance Param Int where
+  fromParam t = case decimal t of
+                  Left _ -> Nothing
+                  Right (_, x) | x /= "" -> Nothing
+                  Right (v, _) -> Just v
+instance Param Double where
+  fromParam t = case double t of
+                  Left _ -> Nothing
+                  Right (_, x) | x /= "" -> Nothing
+                  Right (v, _) -> Just v
+
+param :: Param p => Text -> Req -> (p -> a) -> Maybe (Req, a)
 param n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
-  in case (maybe "" T.decodeUtf8 . snd) <$> match of
+  in case ((maybe "" T.decodeUtf8 . snd) <$> match) >>= fromParam of
        Nothing -> Nothing
        Just p -> Just (req, k p)
+
+paramOptional :: Param p => Text -> Req -> (Maybe p -> a) -> Maybe (Req, a)
+paramOptional n req k =
+  let match = find ((== T.encodeUtf8 n) . fst) (snd req)
+      p = ((maybe "" T.decodeUtf8 . snd) <$> match) >>= fromParam
+  in Just (req, k p)
+
+paramPresent :: Param p => Text -> Req -> (Maybe p -> a) -> Maybe (Req, a)
+paramPresent n req k =
+  let match = find ((== T.encodeUtf8 n) . fst) (snd req)
+      p = ((maybe "" T.decodeUtf8 . snd) <$> match)
+  in case p of
+       Nothing -> Nothing
+       Just p' -> Just (req, k (fromParam p'))
 
 path :: Text -> Req -> a -> Maybe (Req, a)
 path s req k =

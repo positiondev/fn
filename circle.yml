@@ -1,0 +1,20 @@
+machine:
+  environment:
+    LANG: C.UTF-8
+
+dependencies:
+  cache_directories:
+    - "~/.stack"
+    - "~/fn/.stack-work"
+  pre:
+    - wget https://github.com/commercialhaskell/stack/releases/download/v0.1.6.0/stack-0.1.6.0-linux-x86_64.tar.gz -O /tmp/stack.tar.gz
+    - tar xvzf /tmp/stack.tar.gz -C /tmp
+    - sudo mv /tmp/stack-0.1.6.0-linux-x86_64/stack /usr/bin/stack
+  override:
+    - stack setup
+    - stack build --jobs=4
+    - stack test fn --no-run-tests
+
+test:
+  override:
+    - stack test fn

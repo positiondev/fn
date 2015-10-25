@@ -12,9 +12,9 @@ dependencies:
     - sudo mv /tmp/stack-0.1.6.0-linux-x86_64/stack /usr/bin/stack
   override:
     - stack setup
-    - stack build --jobs=4
-    - stack test fn --no-run-tests
+    - stack build --jobs=4 --pedantic
+    - stack test fn --no-run-tests --pedantic
 
 test:
   override:
-    - stack test fn
+    - stack test fn --pedantic

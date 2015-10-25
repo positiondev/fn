@@ -70,14 +70,14 @@ instance Functor (Store b) where
 --
 -- Note that 'requestLens' is defined in terms of 'getRequest' and
 -- 'setRequest' and vice-versa, so you need to define _one_ of these.
-class RequestContext c where
-  requestLens :: Functor f => (Request -> f Request) -> c -> f c
+class RequestContext ctxt where
+  requestLens :: Functor f => (Request -> f Request) -> ctxt -> f ctxt
   requestLens f c = setRequest c <$> f (getRequest c)
-  getRequest :: c -> Request
+  getRequest :: ctxt -> Request
   getRequest c =
     let (Store r _) = requestLens (`Store` id) c
     in r
-  setRequest :: c -> Request -> c
+  setRequest :: ctxt -> Request -> ctxt
   setRequest c r =
     let (Store _ b) = requestLens (`Store` id) c
     in b r
@@ -85,7 +85,7 @@ class RequestContext c where
 -- | Convert an Fn application (provide a context, a context to response
 -- function and we'll create a WAI application by updating the Request
 -- value for each call).
-toWAI :: RequestContext c => c -> (c -> IO Response) -> Application
+toWAI :: RequestContext ctxt => ctxt -> (ctxt -> IO Response) -> Application
 toWAI ctxt f req cont = let ctxt' = setRequest ctxt req
                         in f ctxt' >>= cont
 
@@ -114,9 +114,9 @@ fallthrough a ft =
 --          h :: Text -> Text -> IO (Maybe Response)
 --          h s i = okText ("got path /foo/" <> s <> ", with id=" <> i)
 -- @
-route :: RequestContext c =>
-         c ->
-         [c -> Maybe (IO (Maybe Response))] ->
+route :: RequestContext ctxt =>
+         ctxt ->
+         [ctxt -> Maybe (IO (Maybe Response))] ->
          IO (Maybe Response)
 route _ [] = return Nothing
 route ctxt (x:xs) =
@@ -136,10 +136,10 @@ type Req = ([Text], Query)
 -- illuminating, as it uses polymorphism to be able to match route
 -- patterns with varying numbers (and types) of parts with functions
 -- of the corresponding number of arguments and types.
-(==>) :: RequestContext c =>
-         (Req -> t2 -> Maybe (Req, a)) ->
-         (c -> t2) ->
-         c -> Maybe a
+(==>) :: RequestContext ctxt =>
+         (Req -> k -> Maybe (Req, a)) ->
+         (ctxt -> k) ->
+         ctxt -> Maybe a
 (match ==> handle) ctxt =
    let r = getRequest ctxt
        x = (pathInfo r, queryString r)
@@ -147,11 +147,13 @@ type Req = ([Text], Query)
         Nothing -> Nothing
         Just (_, action) -> Just action
 
--- | Connects two path segments.
-(//) :: (c -> t -> Maybe (c, a')) ->
-        (c -> a' -> Maybe (c, a)) ->
-        c ->
-        t -> Maybe (c, a)
+-- | Connects two path segments. Note that when normally used, the
+-- type parameter r is 'Req'. It is more general here to facilitate
+-- testing.
+(//) :: (r -> k -> Maybe (r, k')) ->
+        (r -> k' -> Maybe (r, a)) ->
+        r ->
+        k -> Maybe (r, a)
 (match1 // match2) req k =
    case match1 req k of
      Nothing -> Nothing
@@ -160,10 +162,10 @@ type Req = ([Text], Query)
 -- | Identical to '(//)', provided simply because it serves as a
 -- nice visual difference when switching from 'path'/'segment' to
 -- 'param' and friends.
-(/?) :: (c -> t -> Maybe (c, a')) ->
-        (c -> a' -> Maybe (c, a)) ->
-        c ->
-        t -> Maybe (c, a)
+(/?) :: (r -> k -> Maybe (r, k')) ->
+        (r -> k' -> Maybe (r, a)) ->
+        r ->
+        k -> Maybe (r, a)
 (/?) = (//)
 
 -- | Matches a literal part of the path. If there is no path part

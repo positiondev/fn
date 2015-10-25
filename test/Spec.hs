@@ -10,10 +10,10 @@ import           Network.Wai
 import           Test.Hspec
 import           Web.Fn
 
-newtype Req = Req ([Text], Query)
-instance RequestContext Req where
-  getRequest (Req (p,q)) = defaultRequest { pathInfo = p, queryString = q }
-  setRequest (Req _) r = Req (pathInfo r, queryString r)
+newtype R = R ([Text], Query)
+instance RequestContext R where
+  getRequest (R (p,q)) = defaultRequest { pathInfo = p, queryString = q }
+  setRequest (R _) r = R (pathInfo r, queryString r)
 
 main :: IO ()
 main = hspec $ do
@@ -95,19 +95,19 @@ main = hspec $ do
            `shouldSatisfy` isNothing
     it "should apply matchers with ==>" $
       do (path "a" ==> const ())
-           (Req (["a"], []))
+           (R (["a"], []))
            `shouldSatisfy` isJust
          (segment ==> \_ (_ :: Text) -> ())
-            (Req (["a"], []))
+            (R (["a"], []))
             `shouldSatisfy` isJust
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
-           (Req (["a", "b"], []))
+           (R (["a", "b"], []))
            `shouldSatisfy` fromJust
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
-           (Req (["a", "a"], []))
+           (R (["a", "a"], []))
            `shouldSatisfy` isNothing
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
-           (Req (["a"], []))
+           (R (["a"], []))
            `shouldSatisfy` isNothing
     it "should always pass a value with paramOptional" $
       do paramOptional "id" ([], []) (isLeft :: Either Text Text -> Bool)

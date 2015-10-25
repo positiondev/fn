@@ -124,6 +124,14 @@ main = hspec $ do
          paramPresent "id" ([], [("id", Just "foo")])
                       (isLeft :: Either Text Int -> Bool)
                       `shouldSatisfy` (snd . fromJust)
+    it "should match end against no further path segments" $
+      do end ([],[]) () `shouldSatisfy` isJust
+         end ([],[("foo", Nothing)]) () `shouldSatisfy` isJust
+         end (["a"],[]) () `shouldSatisfy` isNothing
+    it "should match end after path and segments" $
+      do (path "a" // end) (["a"],[]) () `shouldSatisfy` isJust
+         (segment // end) (["a"],[]) (== ("a" :: Text))
+                                     `shouldSatisfy` isJust
 
 
   describe "parameter parsing" $

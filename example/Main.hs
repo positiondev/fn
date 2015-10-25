@@ -62,12 +62,19 @@ main = withStdoutLogging $
 
 app :: Ctxt -> IO Response
 app ctxt =
-  route ctxt [path "param" /? param "id" ==> paramHandler
+  route ctxt [end ==> indexHandler
+             ,path "param" /? param "id" ==> paramHandler
              ,path "template" ==> templateHandler
              ,path "db" /? param "number" ==> dbHandler
              ,path "segment" // segment ==> segmentHandler
              ]
     `fallthrough` return (responseLBS status404 [] "Page not found.")
+
+indexHandler :: Ctxt -> IO (Maybe Response)
+indexHandler _ =
+  Just <$>
+    W.text status200 []
+           "Try /param?id=123, /template, /db?number=123, or /segment/foo"
 
 paramHandler :: Ctxt -> Int -> IO (Maybe Response)
 paramHandler _ i =

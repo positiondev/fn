@@ -9,6 +9,7 @@ module Web.Fn ( RequestContext(..)
               , (//)
               , (/?)
               , path
+              , end
               , segment
               , Param(..)
               , param
@@ -124,7 +125,7 @@ instance Param Double where
 param :: Param p => Text -> Req -> (p -> a) -> Maybe (Req, a)
 param n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
-  in case ((maybe "" T.decodeUtf8 . snd) <$> match) of
+  in case (maybe "" T.decodeUtf8 . snd) <$> match of
        Nothing -> Nothing
        Just p -> case fromParam p of
          Left _ -> Nothing
@@ -160,3 +161,9 @@ path s req k =
   case fst req of
     (x:xs) | x == s -> Just ((xs, snd req), k)
     _               -> Nothing
+
+end :: Req -> a -> Maybe (Req, a)
+end req k =
+  case fst req of
+    [] -> Just (req, k)
+    _ -> Nothing

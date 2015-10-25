@@ -45,7 +45,7 @@ instance RequestContext Ctxt where
 
 initializer :: IO Ctxt
 initializer =
-  do let ts = loadTemplates "example/templates"
+  do let ts = loadTemplates "templates"
      hs <- runEitherT $
            initHeist (emptyHeistConfig & hcTemplateLocations .~ [ts])
      case hs of
@@ -88,7 +88,7 @@ site ctxt =
              ,path "redis" // segment /? paramOptional "set" ==> redisHandler
              ,path "session" ==> sessionHandler
              ]
-    `fallthrough` return (responseLBS status404 [] "Page not found.")
+    `fallthrough` notFoundText "Page not found."
 
 indexHandler :: Ctxt -> IO (Maybe Response)
 indexHandler _ =

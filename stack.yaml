@@ -2,6 +2,7 @@ resolver: lts-3.10
 
 packages:
 - '.'
+- 'example'
 
 extra-deps:
 - wai-util-0.8

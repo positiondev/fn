@@ -1,16 +1,17 @@
 name:                fn
 version:             0.1.0.0
-synopsis:            A functional web framework
-description:         Please see README.md
+synopsis:            A functional web framework.
+description:         Please see README.
 homepage:            http://github.com/dbp/fn#readme
 license:             ISC
 license-file:        LICENSE
-author:              Daniel Patterson
+author:              Daniel Patterson <dbp@dbpmail.net>
 maintainer:          dbp@dbpmail.net
 copyright:           2015 Daniel Patterson
 category:            Web
 build-type:          Simple
--- extra-source-files:
+extra-source-files:  CHANGELOG.md
+                     README.md
 cabal-version:       >=1.10
 
 library
@@ -24,62 +25,6 @@ library
                      , bytestring
   default-language:    Haskell2010
   ghc-options:         -Wall
-
-executable fn-example
-  hs-source-dirs:      example
-  main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
-  build-depends:       base
-                     , fn
-                     , warp
-                     , wai
-                     , wai-util
-                     , lens
-                     , text
-                     , http-types
-                     , heist
-                     , either
-                     , blaze-builder
-                     , postgresql-simple
-                     , resource-pool
-                     , logging
-                     , hedis
-                     , wai-session
-                     , wai-session-clientsession
-                     , clientsession
-                     , cereal-text
-                     , vault
-                     , data-default
-  default-language:    Haskell2010
-
-test-suite fn-example-test
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      example example/test
-  main-is:             Spec.hs
-  build-depends:       base
-                     , fn
-                     , warp
-                     , wai
-                     , wai-util
-                     , lens
-                     , text
-                     , http-types
-                     , heist
-                     , either
-                     , blaze-builder
-                     , postgresql-simple
-                     , resource-pool
-                     , logging
-                     , hedis
-                     , wai-session
-                     , wai-session-clientsession
-                     , clientsession
-                     , cereal-text
-                     , vault
-                     , data-default
-                     , hspec
-                     , hspec-wai
-
 
 test-suite fn-test
   type:                exitcode-stdio-1.0

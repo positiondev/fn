@@ -51,6 +51,7 @@ module Web.Fn ( -- * Application setup
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
 import           Data.ByteString                    (ByteString)
 import           Data.List                          (find)
+import           Data.Maybe                         (fromJust)
 import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
@@ -286,13 +287,17 @@ errText t = returnText t status500 plainText
 errHtml :: Text -> IO (Maybe Response)
 errHtml t = returnText t status500 html
 
--- | Returns a 404 with the given 'Text' as a body.
-notFoundText :: Text -> IO (Maybe Response)
-notFoundText t = returnText t status404 plainText
+-- | Returns a 404 with the given 'Text' as a body. Note that this
+-- returns a 'IO Response' not an 'IO (Maybe Response)' because the
+-- expectaiton is that you are calling this with 'fallthrough'.
+notFoundText :: Text -> IO Response
+notFoundText t = fromJust <$> returnText t status404 plainText
 
--- | Returns a 404 with the given html as a body.
-notFoundHtml :: Text -> IO (Maybe Response)
-notFoundHtml t = returnText t status404 html
+-- | Returns a 404 with the given html as a body. Note that this
+-- returns a 'IO Response' not an 'IO (Maybe Response)' because the
+-- expectaiton is that you are calling this with 'fallthrough'.
+notFoundHtml :: Text -> IO Response
+notFoundHtml t = fromJust <$> returnText t status404 html
 
 -- | Redirects to the given url. Note that the target is not validated,
 -- so it should be an absolute path/url.

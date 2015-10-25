@@ -5,31 +5,77 @@
 
 ## Example
 
-See the example application in the `example` directory for how to use
-this library.
+See the example application in the repository for a full usage, but a minimal application is the following:
+
+```
+
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+
+import           Control.Lens
+import           Data.Monoid
+import           Data.Text                (Text)
+import qualified Data.Text                as T
+import           Network.HTTP.Types
+import           Network.Wai
+import           Network.Wai.Handler.Warp
+import qualified Network.Wai.Util         as W
+import           Web.Fn
+
+data Ctxt = Ctxt { _req :: Request
+                 }
+
+makeLenses ''Ctxt
+
+instance RequestContext Ctxt where
+  requestLens = req
+
+initializer :: IO Ctxt
+initializer = return (Ctxt defaultRequest)
+
+main :: IO ()
+main = do context <- initializer
+          run 8000 $ toWAI context app
+
+app :: Ctxt -> IO Response
+app ctxt =
+  route ctxt [ end ==> index
+             , path "foo" // segment // path "baz" /? param "id" ==> handler]
+    `fallthrough` notFoundText "Page not found."
+
+index :: IO (Maybe Response)
+index = okText "This is the index page! Try /foo/bar/baz?id=10"
+
+handler :: Ctxt -> Text -> Int -> IO (Maybe Response)
+handler _ fragment i = okText (fragment <> " - " <> T.pack (show i))
+
+```
 
 ## Recommended Pairings
 
 Part of the design of `Fn` is that you won't need a suite of `fn-foo`
 libraries that generally serve to adapt the functions from `foo` to
 the monad transformer stack of the web framework of choice (we may add
-a `fn-extra` package with a few helpers in it in the future, but it'll
+an `fn-extra` package with a few helpers in it in the future, but it'll
 be small). Still, it's helpful to know what are common tools that are
 well designed and tested, so here are a list (those marked with `[*]`
-are used in the example application included in this repository):
+are used in the example application included in the repository):
 
-- [heist](http://hackage.haskell.org/package/heist)`[*]`: a wonderful
-  templating system that is both really simple (the templates are just
-  html) and powerful (any html tag can be bound to run haskell code).
 - [warp](http://hackage.haskell.org/package/warp)`[*]`: perhaps obvious,
   but you will need to choose an HTTP server to use with your `Fn`
   application, and `warp` is the defacto standard for applications that
   use the `WAI` interface that `Fn` does.
+- [heist](http://hackage.haskell.org/package/heist)`[*]`: a wonderful
+  templating system that is both really simple (the templates are just
+  html) and powerful (any html tag can be bound to run haskell
+  code). This may be the one place where we may add some adaptors, as
+  it would be wonderful to have splices (those haskell-bound html
+  tags) that were normal functions, rather than monadic.
 - [postgresql-simple](https://hackage.haskell.org/package/postgresql-simple)`[*]`:
-  a well designed simple interface to PostgreSQL; ofter the lower
-  level way to interact with the database (setting up connections,
-  etc), if you use a higher level, safer abstraction like `opaleye`
-  for actual queries. Use it with
+  a well designed interface to PostgreSQL; ofter the lower level way
+  to interact with the database (setting up connections, etc), if you
+  use a higher level, safer abstraction like `opaleye` (below) for actual
+  queries. Use it with
   [resource-pool](https://hackage.haskell.org/package/resource-pool)`[*]`
   to have it manage many connections.
 - [opaleye](https://hackage.haskell.org/package/opaleye): a type-safe
@@ -39,9 +85,11 @@ are used in the example application included in this repository):
 - [logging](https://hackage.haskell.org/package/logging)`[*]`: a simple
   library for writing log messages, which allow you to change the
   logging level and suppress some subset of messages.
-- [hspec](https://hackage.haskell.org/package/hspec)`[*]`: a full-featured
-  testing framework. Use with
-  [hspec-wai](https://hackage.haskell.org/package/hspec-wai)`[*]`.
+- [hspec](https://hackage.haskell.org/package/hspec)`[*]`: a
+  full-featured testing framework. Use with
+  [hspec-wai](https://hackage.haskell.org/package/hspec-wai)`[*]` -
+  though the latter could use some work to make it do everything it
+  needs to!
 - [wai-session](https://hackage.haskell.org/package/wai-session)`[*]`:
   Combine with something like
   [wai-session-clientsession](https://hackage.haskell.org/package/wai-session-clientsession)`[*]`

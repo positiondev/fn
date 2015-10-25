@@ -42,6 +42,9 @@ executable fn-example
                      , resource-pool
                      , logging
                      , hedis
+                     , wai-session
+                     , vault
+                     , data-default
   default-language:    Haskell2010
 
 test-suite fn-example-test
@@ -63,6 +66,9 @@ test-suite fn-example-test
                      , resource-pool
                      , logging
                      , hedis
+                     , wai-session
+                     , vault
+                     , data-default
                      , hspec
                      , hspec-wai
 

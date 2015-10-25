@@ -40,7 +40,7 @@ example application included in this repository):
 - [hspec](https://hackage.haskell.org/package/hspec)`[*]`: a full-featured
   testing framework. Use with
   [hspec-wai](https://hackage.haskell.org/package/hspec-wai).
-- [wai-session](https://hackage.haskell.org/package/wai-session):
+- [wai-session](https://hackage.haskell.org/package/wai-session)`[*]`:
   Combine with something like
   [wai-session-clientsession](https://hackage.haskell.org/package/wai-session-clientsession)
   to store session data in encrypted cookies (like, who a user is

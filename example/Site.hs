@@ -8,18 +8,24 @@ import           Blaze.ByteString.Builder
 import           Control.Arrow              (first)
 import           Control.Lens
 import           Control.Monad.Trans.Either
+import           Data.Default               (def)
 import           Data.List                  (intercalate)
+import           Data.Maybe                 (fromMaybe)
 import           Data.Monoid
 import           Data.Pool
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
+import qualified Data.Text.Read             as T
+import qualified Data.Vault.Lazy            as Vault
 import qualified Database.PostgreSQL.Simple as PG
 import qualified Database.Redis             as R
 import           Heist
 import           Heist.Interpreted
 import           Network.HTTP.Types
 import           Network.Wai
+import           Network.Wai.Session        (Session, withSession)
+import           Network.Wai.Session.Map    (mapStore_)
 import qualified Network.Wai.Util           as W
 import           Web.Fn
 
@@ -27,6 +33,7 @@ data Ctxt = Ctxt { _req   :: Request
                  , _heist :: HeistState IO
                  , _db    :: Pool PG.Connection
                  , _redis :: R.Connection
+                 , _sess  :: Vault.Key (Session IO Text Text)
                  }
 
 makeLenses ''Ctxt
@@ -50,16 +57,25 @@ initializer =
                                                           "fn_db"))
                               PG.close 1 60 20
          rconn <- R.connect R.defaultConnectInfo
-         return (Ctxt defaultRequest hs' pgpool rconn)
+         session <- Vault.newKey
+         return (Ctxt defaultRequest hs' pgpool rconn session)
 
-app :: Ctxt -> IO Response
-app ctxt =
+app :: IO (Application, IO ())
+app =
+  do store <- mapStore_
+     ctxt <- initializer
+     return (withSession store "_session" def (ctxt ^. sess) (toWAI ctxt site)
+            ,destroyAllResources (ctxt ^. db))
+
+site :: Ctxt -> IO Response
+site ctxt =
   route ctxt [end ==> indexHandler
              ,path "param" /? param "id" ==> paramHandler
              ,path "template" ==> templateHandler
              ,path "db" /? param "number" ==> dbHandler
              ,path "segment" // segment ==> segmentHandler
              ,path "redis" // segment /? paramOptional "set" ==> redisHandler
+             ,path "session" ==> sessionHandler
              ]
     `fallthrough` return (responseLBS status404 [] "Page not found.")
 
@@ -68,7 +84,7 @@ indexHandler _ =
   Just <$>
     W.text status200 []
            ("Try /param?id=123, /template, /db?number=123, /segment/foo,"
-           <> " or /redis/key or /redis/key?set=new")
+           <> " /redis/key, /redis/key?set=new, or /session")
 
 paramHandler :: Ctxt -> Int -> IO (Maybe Response)
 paramHandler _ i =
@@ -106,3 +122,14 @@ redisHandler ctxt key new =
                 Right value ->
                   W.text status200 []
                          (T.pack (show value))
+
+sessionHandler :: Ctxt -> IO (Maybe Response)
+sessionHandler ctxt =
+  do let Just (getsess, putsess) = Vault.lookup (ctxt ^. sess)
+                                                (vault (ctxt ^. req))
+     current <- fromMaybe "0" <$> getsess "visits"
+     let cur = case T.decimal current of
+                 Left _ -> error "Bad value in session"
+                 Right (n,_) -> n
+     putsess "visits" (T.pack (show (cur + 1 :: Int)))
+     Just <$> W.text status200 [] (T.pack (show cur))

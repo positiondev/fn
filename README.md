@@ -28,7 +28,7 @@ example application included in this repository):
   level way to interact with the database (setting up connections,
   etc), if you use a higher level, safer abstraction like `opaleye`
   for actual queries. Use it with
-  [resource-pool](https://hackage.haskell.org/package/resource-pool)
+  [resource-pool](https://hackage.haskell.org/package/resource-pool)`[*]`
   to have it manage many connections.
 - [opaleye](https://hackage.haskell.org/package/opaleye): a type-safe
   composable way to write database queries against PostgreSQL.
@@ -39,9 +39,9 @@ example application included in this repository):
   logging level and suppress some subset of messages.
 - [hspec](https://hackage.haskell.org/package/hspec)`[*]`: a full-featured
   testing framework. Use with
-  [hspec-wai](https://hackage.haskell.org/package/hspec-wai).
+  [hspec-wai](https://hackage.haskell.org/package/hspec-wai)`[*]`.
 - [wai-session](https://hackage.haskell.org/package/wai-session)`[*]`:
   Combine with something like
-  [wai-session-clientsession](https://hackage.haskell.org/package/wai-session-clientsession)
+  [wai-session-clientsession](https://hackage.haskell.org/package/wai-session-clientsession)`[*]`
   to store session data in encrypted cookies (like, who a user is
   logged in as).

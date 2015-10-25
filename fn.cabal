@@ -43,6 +43,9 @@ executable fn-example
                      , logging
                      , hedis
                      , wai-session
+                     , wai-session-clientsession
+                     , clientsession
+                     , cereal-text
                      , vault
                      , data-default
   default-language:    Haskell2010
@@ -67,6 +70,9 @@ test-suite fn-example-test
                      , logging
                      , hedis
                      , wai-session
+                     , wai-session-clientsession
+                     , clientsession
+                     , cereal-text
                      , vault
                      , data-default
                      , hspec

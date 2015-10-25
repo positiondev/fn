@@ -5,28 +5,30 @@
 module Site where
 
 import           Blaze.ByteString.Builder
-import           Control.Arrow              (first)
+import           Control.Arrow                     (first)
 import           Control.Lens
 import           Control.Monad.Trans.Either
-import           Data.Default               (def)
-import           Data.List                  (intercalate)
-import           Data.Maybe                 (fromMaybe)
+import           Data.Default                      (def)
+import           Data.List                         (intercalate)
+import           Data.Maybe                        (fromMaybe)
 import           Data.Monoid
 import           Data.Pool
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
-import qualified Data.Text.Read             as T
-import qualified Data.Vault.Lazy            as Vault
-import qualified Database.PostgreSQL.Simple as PG
-import qualified Database.Redis             as R
+import           Data.Serialize.Text               ()
+import           Data.Text                         (Text)
+import qualified Data.Text                         as T
+import qualified Data.Text.Encoding                as T
+import qualified Data.Text.Read                    as T
+import qualified Data.Vault.Lazy                   as Vault
+import qualified Database.PostgreSQL.Simple        as PG
+import qualified Database.Redis                    as R
 import           Heist
 import           Heist.Interpreted
 import           Network.HTTP.Types
 import           Network.Wai
-import           Network.Wai.Session        (Session, withSession)
-import           Network.Wai.Session.Map    (mapStore_)
-import qualified Network.Wai.Util           as W
+import           Network.Wai.Session               (Session, withSession)
+import           Network.Wai.Session.ClientSession (clientsessionStore)
+import qualified Network.Wai.Util                  as W
+import           Web.ClientSession                 (randomKey)
 import           Web.Fn
 
 data Ctxt = Ctxt { _req   :: Request
@@ -62,7 +64,16 @@ initializer =
 
 app :: IO (Application, IO ())
 app =
-  do store <- mapStore_
+  do -- NOTE(dbp 2015-10-25): in real applications, you would want to only
+     -- call randomKey when you had never before - the first part of the
+     -- tuple is a ByteString you would use for future initializations.
+     -- If you call randomKey each time, every time you restart you would
+     -- invalidate pre-existing sessions. Also, if you have different
+     -- keys on different instances of the application, sessions created
+     -- on one wouldn't be valid on the other (so store the ByteString in
+     -- Redis or something).
+     (_, k) <- randomKey
+     let store = clientsessionStore k
      ctxt <- initializer
      return (withSession store "_session" def (ctxt ^. sess) (toWAI ctxt site)
             ,destroyAllResources (ctxt ^. db))

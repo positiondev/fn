@@ -7,6 +7,8 @@ extra-deps:
 - wai-util-0.8
 - http-accept-0.2
 - logging-3.0.2
+- wai-session-clientsession-0.1
+- cereal-text-0.1.0.1
 
 flags: {}
 

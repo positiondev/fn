@@ -5,16 +5,18 @@
 
 ## Example
 
-See the example in `example` for how to use this library.
+See the example application in the `example` directory for how to use
+this library.
 
 ## Recommended Pairings
 
 Part of the design of `Fn` is that you won't need a suite of `fn-foo`
 libraries that generally serve to adapt the functions from `foo` to
-the monad transformer stack of the web framework of choice. But, it's
-still helpful to know what are common tools that are well designed and
-tested, so here are a list (those marked with `[*]` are used in the
-example application included in this repository):
+the monad transformer stack of the web framework of choice (we may add
+a `fn-extra` package with a few helpers in it in the future, but it'll
+be small). Still, it's helpful to know what are common tools that are
+well designed and tested, so here are a list (those marked with `[*]`
+are used in the example application included in this repository):
 
 - [heist](http://hackage.haskell.org/package/heist)`[*]`: a wonderful
   templating system that is both really simple (the templates are just

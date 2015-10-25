@@ -92,16 +92,12 @@ site ctxt =
 
 indexHandler :: Ctxt -> IO (Maybe Response)
 indexHandler _ =
-  Just <$>
-    W.text status200 []
-           ("Try /param?id=123, /template, /db?number=123, /segment/foo,"
-           <> " /redis/key, /redis/key?set=new, or /session")
+  okText ("Try /param?id=123, /template, /db?number=123, /segment/foo,"
+            <> " /redis/key, /redis/key?set=new, or /session")
 
 paramHandler :: Ctxt -> Int -> IO (Maybe Response)
 paramHandler _ i =
-  Just <$> W.text status200
-                  []
-                  (T.pack (show i))
+  okText (T.pack (show i))
 
 templateHandler :: Ctxt -> IO (Maybe Response)
 templateHandler ctxt =
@@ -113,11 +109,10 @@ templateHandler ctxt =
 dbHandler :: Ctxt -> Int -> IO (Maybe Response)
 dbHandler ctxt n =
   do r <- withResource (ctxt ^. db) $ \c -> PG.query c "select ?" (PG.Only n)
-     Just <$> W.text status200 []
-                     (T.pack (show (r :: [[Int]])))
+     okText (T.pack (show (r :: [[Int]])))
 
 segmentHandler :: Ctxt -> Text -> IO (Maybe Response)
-segmentHandler _ seg = Just <$> W.text status200 [] seg
+segmentHandler _ seg = okText seg
 
 redisHandler :: Ctxt -> Text -> Either Text Text -> IO (Maybe Response)
 redisHandler ctxt key new =
@@ -126,13 +121,11 @@ redisHandler ctxt key new =
                  case new of
                    Left _ -> R.get k
                    Right new' -> R.getset k (T.encodeUtf8 new')
-     Just <$> case res of
-                Left err ->
-                  W.text status500 []
-                         (T.pack (show err))
-                Right value ->
-                  W.text status200 []
-                         (T.pack (show value))
+     case res of
+       Left err ->
+         errText (T.pack (show err))
+       Right value ->
+         okText (T.pack (show value))
 
 sessionHandler :: Ctxt -> IO (Maybe Response)
 sessionHandler ctxt =
@@ -143,4 +136,4 @@ sessionHandler ctxt =
                  Left _ -> error "Bad value in session"
                  Right (n,_) -> n
      putsess "visits" (T.pack (show (cur + 1 :: Int)))
-     Just <$> W.text status200 [] (T.pack (show cur))
+     okText (T.pack (show cur))

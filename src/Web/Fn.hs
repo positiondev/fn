@@ -1,8 +1,31 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Web.Fn ( RequestContext(..)
+{-|
+
+This package provides a simple framework for routing and responses. The
+two primary goals are:
+
+1. All web handler functions are just plain IO. There is no Fn
+monad, or monad transformer. This has a lot of nice properties,
+foremost among them is that it is easier to call handlers from other
+contexts (like GHCi, when testing, in other threads, etc). As a
+result, these functions take a single extra parameter that
+has the context that they need (like database connection pools, the
+request, etc).
+
+2. Web handlers are functions with typed parameters. When routing, we
+specify many parameters (most commonly, numeric ids, but can be many
+things), so the handlers should be functions that take those as
+parameters.
+
+-}
+
+module Web.Fn ( -- * Application setup
+                RequestContext(..)
               , toWAI
+                -- * Routing
+              , Req
               , route
               , fallthrough
               , (==>)
@@ -15,14 +38,24 @@ module Web.Fn ( RequestContext(..)
               , param
               , paramOptional
               , paramPresent
+                -- * Responses
+              , okText
+              , okHtml
+              , errText
+              , errHtml
+              , notFoundText
+              , notFoundHtml
+              , redirect
   ) where
 
-import           Data.List          (find)
-import           Data.Monoid        ((<>))
-import           Data.Text          (Text)
-import qualified Data.Text          as T
-import qualified Data.Text.Encoding as T
-import           Data.Text.Read     (decimal, double)
+import qualified Blaze.ByteString.Builder.Char.Utf8 as B
+import           Data.ByteString                    (ByteString)
+import           Data.List                          (find)
+import           Data.Monoid                        ((<>))
+import           Data.Text                          (Text)
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as T
+import           Data.Text.Read                     (decimal, double)
 import           Network.HTTP.Types
 import           Network.Wai
 
@@ -30,6 +63,13 @@ data Store b a = Store b (b -> a)
 instance Functor (Store b) where
   fmap f (Store b h) = Store b (f . h)
 
+-- | Specify the way that Fn can get the Request out of your context.
+--
+-- The easiest way to instantiate this is to use the lens, but if you
+-- don't want to use lenses, define 'getRequest' and 'setRequest'.
+--
+-- Note that 'requestLens' is defined in terms of 'getRequest' and
+-- 'setRequest' and vice-versa, so you need to define _one_ of these.
 class RequestContext c where
   requestLens :: Functor f => (Request -> f Request) -> c -> f c
   requestLens f c = setRequest c <$> f (getRequest c)
@@ -42,10 +82,18 @@ class RequestContext c where
     let (Store _ b) = requestLens (`Store` id) c
     in b r
 
+-- | Convert an Fn application (provide a context, a context to response
+-- function and we'll create a WAI application by updating the Request
+-- value for each call).
 toWAI :: RequestContext c => c -> (c -> IO Response) -> Application
 toWAI ctxt f req cont = let ctxt' = setRequest ctxt req
                         in f ctxt' >>= cont
 
+-- | The 'route' function (and all your handlers) return
+-- 'IO (Maybe Response)', because each can elect to not respond (in
+-- which case we will continue to match on routes). But to construct
+-- an application, we need a response in the case that nothing matched
+-- - this is what 'fallthrough' does.
 fallthrough :: IO (Maybe Response) -> IO Response -> IO Response
 fallthrough a ft =
   do response <- a
@@ -53,6 +101,19 @@ fallthrough a ft =
        Nothing -> ft
        Just r -> return r
 
+-- | The main construct for Fn, 'route' takes a context (which it will pass
+-- to all handlers) and a list of potential matches (which, once they
+-- match, may still end up deciding not to handle the request - hence
+-- the double 'Maybe'). It can be nested.
+--
+-- @
+--  app c = route c [ end ==> index
+--                  , path "foo" // path "bar" // segment /? param "id ==> h]
+--    where index :: IO (Maybe Response)
+--          index = okText "This is the index."
+--          h :: Text -> Text -> IO (Maybe Response)
+--          h s i = okText ("got path /foo/" <> s <> ", with id=" <> i)
+-- @
 route :: RequestContext c =>
          c ->
          [c -> Maybe (IO (Maybe Response))] ->
@@ -67,8 +128,14 @@ route ctxt (x:xs) =
            Nothing -> route ctxt xs
            Just response -> return (Just response)
 
+-- | The parts of the path, when split on /, and the query.
 type Req = ([Text], Query)
 
+-- | The connective between route patterns and the handler that will
+-- be called if the pattern matches. The type is not particularly
+-- illuminating, as it uses polymorphism to be able to match route
+-- patterns with varying numbers (and types) of parts with functions
+-- of the corresponding number of arguments and types.
 (==>) :: RequestContext c =>
          (Req -> t2 -> Maybe (Req, a)) ->
          (c -> t2) ->
@@ -80,7 +147,7 @@ type Req = ([Text], Query)
         Nothing -> Nothing
         Just (_, action) -> Just action
 
-
+-- | Connects two path segments.
 (//) :: (c -> t -> Maybe (c, a')) ->
         (c -> a' -> Maybe (c, a)) ->
         c ->
@@ -90,12 +157,34 @@ type Req = ([Text], Query)
      Nothing -> Nothing
      Just (req', k') -> match2 req' k'
 
+-- | Identical to '(//)', provided simply because it serves as a
+-- nice visual difference when switching from 'path'/'segment' to
+-- 'param' and friends.
 (/?) :: (c -> t -> Maybe (c, a')) ->
         (c -> a' -> Maybe (c, a)) ->
         c ->
         t -> Maybe (c, a)
 (/?) = (//)
 
+-- | Matches a literal part of the path. If there is no path part
+-- left, or the next part does not match, the whole match fails.
+path :: Text -> Req -> a -> Maybe (Req, a)
+path s req k =
+  case fst req of
+    (x:xs) | x == s -> Just ((xs, snd req), k)
+    _               -> Nothing
+
+-- | Matches there being no parts of the path left. This is useful when
+-- matching index routes.
+end :: Req -> a -> Maybe (Req, a)
+end req k =
+  case fst req of
+    [] -> Just (req, k)
+    _ -> Nothing
+
+-- | Captures a part of the path. It will parse the part into the type
+-- specified by the handler it is matched to. If there is no segment, or
+-- if the segment cannot be parsed as such, it won't match.
 segment :: Param p => Req -> (p -> a) -> Maybe (Req, a)
 segment req k =
   case fst req of
@@ -104,6 +193,8 @@ segment req k =
                 Right p -> Just ((xs, snd req), k p)
     _     -> Nothing
 
+-- | A class that is used for parsing for 'param', 'paramOptional',
+-- 'paramPresent', and 'segment'.
 class Param a where
   fromParam :: Text -> Either Text a
 
@@ -122,6 +213,9 @@ instance Param Double where
                             Left ("Incomplete match: " <> T.pack (show m))
                   Right (v, _) -> Right v
 
+-- | Matches on a query parameter of the given name. If there is no
+-- parameter, or it cannot be parsed into the type needed by the
+-- handler, it won't match.
 param :: Param p => Text -> Req -> (p -> a) -> Maybe (Req, a)
 param n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
@@ -131,6 +225,10 @@ param n req k =
          Left _ -> Nothing
          Right p' -> Just (req, k p')
 
+-- | If the specified parameter is present, it will be parsed into the
+-- type needed by the handler, but if it isn't present or cannot be
+-- parsed, the handler will still be called (just with the 'Left'
+-- variant).
 paramOptional :: Param p =>
                  Text ->
                  Req ->
@@ -143,7 +241,7 @@ paramOptional n req k =
        Nothing -> Just (req, k (Left "param missing"))
        Just p' -> Just (req, k (fromParam p'))
 
-
+-- | Matches a query parameter, which must be present, but can fail to parse.
 paramPresent :: Param p =>
                 Text ->
                 Req ->
@@ -156,14 +254,49 @@ paramPresent n req k =
        Nothing -> Nothing
        Just p' -> Just (req, k (fromParam p'))
 
-path :: Text -> Req -> a -> Maybe (Req, a)
-path s req k =
-  case fst req of
-    (x:xs) | x == s -> Just ((xs, snd req), k)
-    _               -> Nothing
 
-end :: Req -> a -> Maybe (Req, a)
-end req k =
-  case fst req of
-    [] -> Just (req, k)
-    _ -> Nothing
+returnText :: Text -> Status -> ByteString -> IO (Maybe Response)
+returnText text status content =
+  return $ Just $
+    responseBuilder status
+                    [(hContentType, content)]
+                    (B.fromText text)
+
+plainText :: ByteString
+plainText = "text/plain; charset=utf-8"
+
+html :: ByteString
+html = "text/html; charset=utf-8"
+
+-- | Returns 'Text' as a response.
+okText :: Text -> IO (Maybe Response)
+okText t = returnText t status200 plainText
+
+-- | Returns Html (in 'Text') as a response.
+okHtml :: Text -> IO (Maybe Response)
+okHtml t = returnText t status200 html
+
+-- | Returns 'Text' as a response with a 500 status code.
+errText :: Text -> IO (Maybe Response)
+errText t = returnText t status500 plainText
+
+-- | Returns Html (in 'Text') as a response with a 500 status code.
+errHtml :: Text -> IO (Maybe Response)
+errHtml t = returnText t status500 html
+
+-- | Returns a 404 with the given 'Text' as a body.
+notFoundText :: Text -> IO (Maybe Response)
+notFoundText t = returnText t status404 plainText
+
+-- | Returns a 404 with the given html as a body.
+notFoundHtml :: Text -> IO (Maybe Response)
+notFoundHtml t = returnText t status404 html
+
+-- | Redirects to the given url. Note that the target is not validated,
+-- so it should be an absolute path/url.
+redirect :: Text -> IO (Maybe Response)
+redirect target =
+  return $ Just $
+    responseBuilder status303
+                    [(hLocation, T.encodeUtf8 target)]
+                    (B.fromText "")

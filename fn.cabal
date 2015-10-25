@@ -20,6 +20,8 @@ library
                      , wai
                      , http-types
                      , text
+                     , blaze-builder
+                     , bytestring
   default-language:    Haskell2010
   ghc-options:         -Wall
 

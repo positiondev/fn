@@ -23,9 +23,12 @@ tested, so here are a list:
   application, and `warp` is the defacto standard for applications that
   use the `WAI` interface that `Fn` does.
 - [postgresql-simple](https://hackage.haskell.org/package/postgresql-simple):
-  a well designed simple interface to PostgreSQL; ofter the lower level
-  way to interact with the database (setting up connections, etc), if you
-  use a higher level, safer abstraction like `opaleye` for actual queries.
+  a well designed simple interface to PostgreSQL; ofter the lower
+  level way to interact with the database (setting up connections,
+  etc), if you use a higher level, safer abstraction like `opaleye`
+  for actual queries. Use it with
+  [resource-pool](https://hackage.haskell.org/package/resource-pool)
+  to have it manage many connections.
 - [opaleye](https://hackage.haskell.org/package/opaleye): a type-safe
   composable way to write database queries against PostgreSQL.
 - [hedis](https://hackage.haskell.org/package/hedis): a full-featured

@@ -38,6 +38,9 @@ executable fn-example
                      , heist
                      , either
                      , blaze-builder
+                     , postgresql-simple
+                     , resource-pool
+                     , logging
   default-language:    Haskell2010
 
 test-suite fn-test

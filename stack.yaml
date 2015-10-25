@@ -6,6 +6,7 @@ packages:
 extra-deps:
 - wai-util-0.8
 - http-accept-0.2
+- logging-3.0.2
 
 flags: {}
 

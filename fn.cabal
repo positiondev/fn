@@ -41,6 +41,7 @@ executable fn-example
                      , postgresql-simple
                      , resource-pool
                      , logging
+                     , hedis
   default-language:    Haskell2010
 
 test-suite fn-test

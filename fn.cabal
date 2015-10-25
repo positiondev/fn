@@ -44,6 +44,29 @@ executable fn-example
                      , hedis
   default-language:    Haskell2010
 
+test-suite fn-example-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      example example/test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , fn
+                     , warp
+                     , wai
+                     , wai-util
+                     , lens
+                     , text
+                     , http-types
+                     , heist
+                     , either
+                     , blaze-builder
+                     , postgresql-simple
+                     , resource-pool
+                     , logging
+                     , hedis
+                     , hspec
+                     , hspec-wai
+
+
 test-suite fn-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test

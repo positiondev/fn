@@ -5,7 +5,7 @@
 
 ## Example
 
-See the example in `example/Main.hs` for how to use this library.
+See the example in `example` for how to use this library.
 
 ## Recommended Pairings
 
@@ -37,7 +37,7 @@ example application included in this repository):
 - [logging](https://hackage.haskell.org/package/logging)`[*]`: a simple
   library for writing log messages, which allow you to change the
   logging level and suppress some subset of messages.
-- [hspec](https://hackage.haskell.org/package/hspec): a full-featured
+- [hspec](https://hackage.haskell.org/package/hspec)`[*]`: a full-featured
   testing framework. Use with
   [hspec-wai](https://hackage.haskell.org/package/hspec-wai).
 - [wai-session](https://hackage.haskell.org/package/wai-session):

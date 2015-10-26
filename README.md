@@ -95,3 +95,11 @@ are used in the example application included in the repository):
   [wai-session-clientsession](https://hackage.haskell.org/package/wai-session-clientsession)`[*]`
   to store session data in encrypted cookies (like, who a user is
   logged in as).
+- [dotenv](http://hackage.haskell.org/package/dotenv): Loads a file
+  full of `KEY=value` lines into environment variables. Convention is
+  to have a `.env` file, not checked into version control, with
+  development configuration variables (like database server, username,
+  password, api keys, etc), so that in production (where the `.env`
+  file is missing) you can have the real environment variables set by
+  whatever mechanism you have (Heroku uses this as it's primary
+  mechanism, for example).

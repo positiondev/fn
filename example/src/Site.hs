@@ -4,12 +4,9 @@
 
 module Site where
 
-import           Blaze.ByteString.Builder
-import           Control.Arrow                     (first)
 import           Control.Lens
 import           Control.Logging
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Either
 import           Data.Default                      (def)
 import           Data.Maybe                        (fromMaybe)
 import           Data.Monoid
@@ -23,15 +20,13 @@ import qualified Data.Vault.Lazy                   as Vault
 import qualified Database.PostgreSQL.Simple        as PG
 import qualified Database.Redis                    as R
 import           Heist
-import           Heist.Interpreted
-import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Session               (Session, withSession)
 import           Network.Wai.Session.ClientSession (clientsessionStore)
-import qualified Network.Wai.Util                  as W
 import qualified Text.XmlHtml                      as X
 import           Web.ClientSession                 (randomKey)
 import           Web.Fn
+import           Web.Fn.Extra.Heist
 
 data Ctxt = Ctxt { _req   :: Request
                  , _heist :: HeistState (ReaderT Ctxt IO)
@@ -45,30 +40,25 @@ makeLenses ''Ctxt
 instance RequestContext Ctxt where
   requestLens = req
 
-splices :: Splices (Splice (ReaderT Ctxt IO))
-splices = "current-url" ## do currentUrl <- asks (T.decodeUtf8 . rawPathInfo . (^. req))
-                              return [X.TextNode currentUrl]
+instance HeistContext Ctxt where
+  heistLens = heist
 
 initializer :: IO Ctxt
 initializer =
-  do let ts = loadTemplates "templates"
-     hs <- runEitherT $
-           initHeist (emptyHeistConfig & hcTemplateLocations .~ [ts]
-                                       & hcInterpretedSplices .~ splices
-                                       & hcLoadTimeSplices .~ defaultLoadTimeSplices
-                                       & hcNamespace .~ "")
-     case hs of
-       Left ers -> errorL' ("Heist failed to load templates: \n" <> T.intercalate "\n" (map T.pack ers))
-       Right hs' -> do
-         pgpool <- createPool (PG.connect (PG.ConnectInfo "localhost"
-                                                          5432
-                                                          "fn_user"
-                                                          "111"
-                                                          "fn_db"))
-                              PG.close 1 60 20
-         rconn <- R.connect R.defaultConnectInfo
-         session <- Vault.newKey
-         return (Ctxt defaultRequest hs' pgpool rconn session)
+  do hs' <- heistInit ["templates"] ("current-url" ## do currentUrl <- asks (T.decodeUtf8 . rawPathInfo . (^. req))
+                                                         return [X.TextNode currentUrl])
+     let hs = case hs' of
+                Left ers -> errorL' ("Heist failed to load templates: \n" <> T.intercalate "\n" (map T.pack ers))
+                Right hs'' -> hs''
+     pgpool <- createPool (PG.connect (PG.ConnectInfo "localhost"
+                                                      5432
+                                                      "fn_user"
+                                                      "111"
+                                                      "fn_db"))
+                          PG.close 1 60 20
+     rconn <- R.connect R.defaultConnectInfo
+     session <- Vault.newKey
+     return (Ctxt defaultRequest hs pgpool rconn session)
 
 app :: IO (Application, IO ())
 app =
@@ -109,10 +99,10 @@ paramHandler _ i =
 
 templateHandler :: Ctxt -> IO (Maybe Response)
 templateHandler ctxt =
-  do r <- runReaderT (renderTemplate (ctxt ^. heist) "template") ctxt
-     case first toLazyByteString <$> r of
+  do t <- render ctxt "template"
+     case t of
        Nothing -> okText "Could not find template. Did you start application from example directory?"
-       Just (h,m) -> Just <$> W.bytestring status200 [(hContentType, m)] h
+       Just _ -> return t
 
 dbHandler :: Ctxt -> Int -> IO (Maybe Response)
 dbHandler ctxt n =

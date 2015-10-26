@@ -19,15 +19,12 @@ executable fn-example
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
                      , fn
+                     , fn-extra
                      , warp
                      , wai
-                     , wai-util
                      , lens
                      , text
-                     , http-types
                      , heist
-                     , either
-                     , blaze-builder
                      , postgresql-simple
                      , resource-pool
                      , logging
@@ -49,15 +46,12 @@ test-suite fn-example-test
   other-modules:       Site
   build-depends:       base
                      , fn
+                     , fn-extra
                      , warp
                      , wai
-                     , wai-util
                      , lens
                      , text
-                     , http-types
                      , heist
-                     , either
-                     , blaze-builder
                      , postgresql-simple
                      , resource-pool
                      , logging

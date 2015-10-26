@@ -11,7 +11,6 @@ import           Control.Logging
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Either
 import           Data.Default                      (def)
-import           Data.List                         (intercalate)
 import           Data.Maybe                        (fromMaybe)
 import           Data.Monoid
 import           Data.Pool
@@ -47,8 +46,8 @@ instance RequestContext Ctxt where
   requestLens = req
 
 splices :: Splices (Splice (ReaderT Ctxt IO))
-splices = "current-url" ## do path <- asks (T.decodeUtf8 . rawPathInfo . (^. req))
-                              return [X.TextNode path]
+splices = "current-url" ## do currentUrl <- asks (T.decodeUtf8 . rawPathInfo . (^. req))
+                              return [X.TextNode currentUrl]
 
 initializer :: IO Ctxt
 initializer =

@@ -1,5 +1,5 @@
 <html>
   <body>
-    HELLO!
+    HELLO! My url is <current-url/>.
   </body>
 </html>

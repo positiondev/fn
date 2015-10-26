@@ -7,6 +7,8 @@ module Site where
 import           Blaze.ByteString.Builder
 import           Control.Arrow                     (first)
 import           Control.Lens
+import           Control.Logging
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Either
 import           Data.Default                      (def)
 import           Data.List                         (intercalate)
@@ -28,11 +30,12 @@ import           Network.Wai
 import           Network.Wai.Session               (Session, withSession)
 import           Network.Wai.Session.ClientSession (clientsessionStore)
 import qualified Network.Wai.Util                  as W
+import qualified Text.XmlHtml                      as X
 import           Web.ClientSession                 (randomKey)
 import           Web.Fn
 
 data Ctxt = Ctxt { _req   :: Request
-                 , _heist :: HeistState IO
+                 , _heist :: HeistState (ReaderT Ctxt IO)
                  , _db    :: Pool PG.Connection
                  , _redis :: R.Connection
                  , _sess  :: Vault.Key (Session IO Text Text)
@@ -43,14 +46,20 @@ makeLenses ''Ctxt
 instance RequestContext Ctxt where
   requestLens = req
 
+splices :: Splices (Splice (ReaderT Ctxt IO))
+splices = "current-url" ## do path <- asks (T.decodeUtf8 . rawPathInfo . (^. req))
+                              return [X.TextNode path]
+
 initializer :: IO Ctxt
 initializer =
   do let ts = loadTemplates "templates"
      hs <- runEitherT $
-           initHeist (emptyHeistConfig & hcTemplateLocations .~ [ts])
+           initHeist (emptyHeistConfig & hcTemplateLocations .~ [ts]
+                                       & hcInterpretedSplices .~ splices
+                                       & hcLoadTimeSplices .~ defaultLoadTimeSplices
+                                       & hcNamespace .~ "")
      case hs of
-       Left ers -> error ("Heist failed to load templates: \n" <>
-                          intercalate "\n" ers)
+       Left ers -> errorL' ("Heist failed to load templates: \n" <> T.intercalate "\n" (map T.pack ers))
        Right hs' -> do
          pgpool <- createPool (PG.connect (PG.ConnectInfo "localhost"
                                                           5432
@@ -101,9 +110,9 @@ paramHandler _ i =
 
 templateHandler :: Ctxt -> IO (Maybe Response)
 templateHandler ctxt =
-  do r <- renderTemplate (ctxt ^. heist) "template"
+  do r <- runReaderT (renderTemplate (ctxt ^. heist) "template") ctxt
      case first toLazyByteString <$> r of
-       Nothing -> return Nothing
+       Nothing -> okText "Could not find template. Did you start application from example directory?"
        Just (h,m) -> Just <$> W.bytestring status200 [(hContentType, m)] h
 
 dbHandler :: Ctxt -> Int -> IO (Maybe Response)

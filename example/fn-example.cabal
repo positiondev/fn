@@ -37,6 +37,8 @@ executable fn-example
                      , cereal-text
                      , vault
                      , data-default
+                     , xmlhtml
+                     , mtl
   default-language:    Haskell2010
 
 test-suite fn-example-test
@@ -64,6 +66,8 @@ test-suite fn-example-test
                      , cereal-text
                      , vault
                      , data-default
+                     , xmlhtml
+                     , mtl
                      , hspec
                      , hspec-wai
   default-language:    Haskell2010

@@ -1,5 +1,1 @@
-<html>
-  <body>
-    HELLO! My url is <current-url n="10" prefix="x:"/>.
-  </body>
-</html>
+<html><body><current-url n="2" prefix="x:"/></body></html>

@@ -6,7 +6,6 @@ module Site where
 
 import           Control.Lens
 import           Control.Logging
-import           Control.Monad.Reader
 import           Data.Default                      (def)
 import           Data.Maybe                        (fromMaybe)
 import           Data.Monoid
@@ -29,7 +28,7 @@ import           Web.Fn
 import           Web.Fn.Extra.Heist
 
 data Ctxt = Ctxt { _req   :: Request
-                 , _heist :: HeistState (ReaderT Ctxt IO)
+                 , _heist :: FnHeistState Ctxt
                  , _db    :: Pool PG.Connection
                  , _redis :: R.Connection
                  , _sess  :: Vault.Key (Session IO Text Text)
@@ -43,10 +42,19 @@ instance RequestContext Ctxt where
 instance HeistContext Ctxt where
   heistLens = heist
 
+exampleSplices :: Splices (FnSplice Ctxt)
+exampleSplices =
+  tag "current-url" (attr "n" &= attrOpt "prefix") $ \ctxt _ rep pref ->
+    return $
+    replicate
+      rep
+      (X.TextNode (fromMaybe "" pref <> (T.decodeUtf8 . rawPathInfo $ ctxt ^. req)))
+
 initializer :: IO Ctxt
 initializer =
-  do hs' <- heistInit ["templates"] ("current-url" ## do currentUrl <- asks (T.decodeUtf8 . rawPathInfo . (^. req))
-                                                         return [X.TextNode currentUrl])
+  do hs' <- heistInit
+              ["templates"]
+              exampleSplices
      let hs = case hs' of
                 Left ers -> errorL' ("Heist failed to load templates: \n" <> T.intercalate "\n" (map T.pack ers))
                 Right hs'' -> hs''

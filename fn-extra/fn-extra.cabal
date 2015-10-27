@@ -19,6 +19,7 @@ library
   exposed-modules:     Web.Fn.Extra.Heist
   build-depends:       base >= 4.7 && < 5
                      , heist
+                     , xmlhtml
                      , http-types
                      , wai
                      , wai-util

@@ -109,21 +109,12 @@ main = hspec $ do
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
            (R (["a"], []))
            `shouldSatisfy` isNothing
-    it "should always pass a value with paramOptional" $
-      do paramOptional "id" ([], []) (isLeft :: Either Text Text -> Bool)
-                       `shouldSatisfy` (snd . fromJust)
-         paramOptional "id" ([], [("id", Just "foo")])
+    it "should always pass a value with paramOpt" $
+      do paramOpt "id" ([], []) (isLeft :: Either Text Text -> Bool)
+                  `shouldSatisfy` (snd . fromJust)
+         paramOpt "id" ([], [("id", Just "foo")])
                        (== Right ("foo" :: Text))
                        `shouldSatisfy` (snd . fromJust)
-    it "should succeed if present, even if unparsable, w/ paramPresent" $
-      do paramPresent "id" ([], []) (isLeft :: Either Text Text -> Bool)
-                      `shouldSatisfy` isNothing
-         paramPresent "id" ([], [("id", Just "foo")])
-                      (== Right ("foo" :: Text))
-                      `shouldSatisfy` (snd . fromJust)
-         paramPresent "id" ([], [("id", Just "foo")])
-                      (isLeft :: Either Text Int -> Bool)
-                      `shouldSatisfy` (snd . fromJust)
     it "should match end against no further path segments" $
       do end ([],[]) () `shouldSatisfy` isJust
          end ([],[("foo", Nothing)]) () `shouldSatisfy` isJust

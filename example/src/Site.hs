@@ -91,7 +91,7 @@ site ctxt =
              ,path "template" ==> templateHandler
              ,path "db" /? param "number" ==> dbHandler
              ,path "segment" // segment ==> segmentHandler
-             ,path "redis" // segment /? paramOptional "set" ==> redisHandler
+             ,path "redis" // segment /? paramOpt "set" ==> redisHandler
              ,path "session" ==> sessionHandler
              ]
     `fallthrough` notFoundText "Page not found."

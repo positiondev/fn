@@ -36,8 +36,7 @@ module Web.Fn ( -- * Application setup
               , segment
               , FromParam(..)
               , param
-              , paramOptional
-              , paramPresent
+              , paramOpt
                 -- * Responses
               , okText
               , okHtml
@@ -196,8 +195,8 @@ segment req k =
                 Right p -> Just ((xs, snd req), k p)
     _     -> Nothing
 
--- | A class that is used for parsing for 'param', 'paramOptional',
--- 'paramPresent', and 'segment'.
+-- | A class that is used for parsing for 'param', 'paramOpt', and
+-- 'segment'.
 class FromParam a where
   fromParam :: Text -> Either Text a
 
@@ -232,31 +231,17 @@ param n req k =
 -- type needed by the handler, but if it isn't present or cannot be
 -- parsed, the handler will still be called (just with the 'Left'
 -- variant).
-paramOptional :: FromParam p =>
-                 Text ->
-                 Req ->
-                 (Either Text p -> a) ->
-                 Maybe (Req, a)
-paramOptional n req k =
+paramOpt :: FromParam p =>
+            Text ->
+            Req ->
+            (Either Text p -> a) ->
+            Maybe (Req, a)
+paramOpt n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
       p = ((maybe "" T.decodeUtf8 . snd) <$> match)
   in case p of
        Nothing -> Just (req, k (Left "param missing"))
        Just p' -> Just (req, k (fromParam p'))
-
--- | Matches a query parameter, which must be present, but can fail to parse.
-paramPresent :: FromParam p =>
-                Text ->
-                Req ->
-                (Either Text p -> a) ->
-                Maybe (Req, a)
-paramPresent n req k =
-  let match = find ((== T.encodeUtf8 n) . fst) (snd req)
-      p = ((maybe "" T.decodeUtf8 . snd) <$> match)
-  in case p of
-       Nothing -> Nothing
-       Just p' -> Just (req, k (fromParam p'))
-
 
 returnText :: Text -> Status -> ByteString -> IO (Maybe Response)
 returnText text status content =

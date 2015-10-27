@@ -34,7 +34,7 @@ module Web.Fn ( -- * Application setup
               , path
               , end
               , segment
-              , Param(..)
+              , FromParam(..)
               , param
               , paramOptional
               , paramPresent
@@ -188,7 +188,7 @@ end req k =
 -- | Captures a part of the path. It will parse the part into the type
 -- specified by the handler it is matched to. If there is no segment, or
 -- if the segment cannot be parsed as such, it won't match.
-segment :: Param p => Req -> (p -> a) -> Maybe (Req, a)
+segment :: FromParam p => Req -> (p -> a) -> Maybe (Req, a)
 segment req k =
   case fst req of
     (x:xs) -> case fromParam x of
@@ -198,18 +198,18 @@ segment req k =
 
 -- | A class that is used for parsing for 'param', 'paramOptional',
 -- 'paramPresent', and 'segment'.
-class Param a where
+class FromParam a where
   fromParam :: Text -> Either Text a
 
-instance Param Text where
+instance FromParam Text where
   fromParam = Right
-instance Param Int where
+instance FromParam Int where
   fromParam t = case decimal t of
                   Left msg -> Left (T.pack msg)
                   Right m | snd m /= "" ->
                             Left ("Incomplete match: " <> T.pack (show m))
                   Right (v, _) -> Right v
-instance Param Double where
+instance FromParam Double where
   fromParam t = case double t of
                   Left msg -> Left (T.pack msg)
                   Right m | snd m /= "" ->
@@ -219,7 +219,7 @@ instance Param Double where
 -- | Matches on a query parameter of the given name. If there is no
 -- parameter, or it cannot be parsed into the type needed by the
 -- handler, it won't match.
-param :: Param p => Text -> Req -> (p -> a) -> Maybe (Req, a)
+param :: FromParam p => Text -> Req -> (p -> a) -> Maybe (Req, a)
 param n req k =
   let match = find ((== T.encodeUtf8 n) . fst) (snd req)
   in case (maybe "" T.decodeUtf8 . snd) <$> match of
@@ -232,7 +232,7 @@ param n req k =
 -- type needed by the handler, but if it isn't present or cannot be
 -- parsed, the handler will still be called (just with the 'Left'
 -- variant).
-paramOptional :: Param p =>
+paramOptional :: FromParam p =>
                  Text ->
                  Req ->
                  (Either Text p -> a) ->
@@ -245,7 +245,7 @@ paramOptional n req k =
        Just p' -> Just (req, k (fromParam p'))
 
 -- | Matches a query parameter, which must be present, but can fail to parse.
-paramPresent :: Param p =>
+paramPresent :: FromParam p =>
                 Text ->
                 Req ->
                 (Either Text p -> a) ->

@@ -1,5 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+
+This module contains helpers to make Heist fit in more closely within
+`Fn`'s stance against monad transformers and for regular functions.
+
+In particular, it instantiates the Monad for HeistState to be a
+ReaderT that contains our context, so that in the splices we can get
+the context out.
+
+Further, we add splice builders that work similar to our url
+routing - splices are declared to have certain attributes of specific
+types, and the splice that correspond is a function that takes those
+as arguments (and takes the context and the node as well).
+
+-}
+
 module Web.Fn.Extra.Heist ( -- * Types
                             HeistContext(..)
                           , FnHeistState
@@ -10,8 +26,8 @@ module Web.Fn.Extra.Heist ( -- * Types
                           , render
                           , renderWithSplices
                             -- * Building splices
-                          , FromAttribute(..)
                           , tag
+                          , FromAttribute(..)
                           , attr
                           , attrOpt
                           , (&=)
@@ -119,10 +135,17 @@ instance FromAttribute Double where
 -- and a handler function (which takes the context, the node, and the
 -- specified attributes), it will pass the handler function the
 -- provided attributes or return nothing, if the attributes are
--- missing / not deserializable. For example:
+-- missing / not deserializable.
+--
+-- Note that due to the dynamism (the handler function can have any
+-- number of arguments, and the number / type of them is based on the
+-- matcher), the types of this may be a little confusing (in
+-- particular, the `k` contains a lot). This continuation-based style
+-- lets us achieve this style, but the types suffer. It may be easier
+-- to see via an example:
 --
 -- @
---  tag "posts" (attr "num" & attr "sort") $ \ctxt node num sort -> ...
+--  tag "posts" (attr "num" & attr "sort") $ \\ctxt node num sort -> ...
 -- @
 tag :: Text ->
        (X.Node -> k -> Maybe (X.Node, FnSplice ctxt)) ->

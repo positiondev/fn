@@ -35,7 +35,9 @@ module Web.Fn ( -- * Application setup
               , end
               , segment
               , FromParam(..)
+              , ParamError(..)
               , param
+              , paramMany
               , paramOpt
                 -- * Responses
               , okText
@@ -49,6 +51,7 @@ module Web.Fn ( -- * Application setup
 
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
 import           Data.ByteString                    (ByteString)
+import           Data.Either                        (rights)
 import           Data.List                          (find)
 import           Data.Maybe                         (fromJust)
 import           Data.Monoid                        ((<>))
@@ -195,53 +198,68 @@ segment req k =
                 Right p -> Just ((xs, snd req), k p)
     _     -> Nothing
 
+data ParamError = ParamMissing | ParamUnparsable | ParamOtherError Text deriving (Eq, Show)
+
 -- | A class that is used for parsing for 'param', 'paramOpt', and
 -- 'segment'.
 class FromParam a where
-  fromParam :: Text -> Either Text a
+  fromParam :: Text -> Either ParamError a
 
 instance FromParam Text where
   fromParam = Right
 instance FromParam Int where
   fromParam t = case decimal t of
-                  Left msg -> Left (T.pack msg)
+                  Left _ -> Left ParamUnparsable
                   Right m | snd m /= "" ->
-                            Left ("Incomplete match: " <> T.pack (show m))
+                            Left ParamUnparsable
                   Right (v, _) -> Right v
 instance FromParam Double where
   fromParam t = case double t of
-                  Left msg -> Left (T.pack msg)
+                  Left _ -> Left ParamUnparsable
                   Right m | snd m /= "" ->
-                            Left ("Incomplete match: " <> T.pack (show m))
+                            Left ParamUnparsable
                   Right (v, _) -> Right v
 
--- | Matches on a query parameter of the given name. If there is no
--- parameter, or it cannot be parsed into the type needed by the
+-- | Matches on a single query parameter of the given name. If there is no
+-- parameters, or it cannot be parsed into the type needed by the
 -- handler, it won't match.
 param :: FromParam p => Text -> Req -> (p -> a) -> Maybe (Req, a)
 param n req k =
-  let match = find ((== T.encodeUtf8 n) . fst) (snd req)
-  in case (maybe "" T.decodeUtf8 . snd) <$> match of
-       Nothing -> Nothing
-       Just p -> case fromParam p of
-         Left _ -> Nothing
-         Right p' -> Just (req, k p')
+  let match = filter ((== T.encodeUtf8 n) . fst) (snd req)
+  in case rights (map (fromParam . maybe "" T.decodeUtf8 . snd) match) of
+       [x] -> Just (req, k x)
+       _ -> Nothing
 
--- | If the specified parameter is present, it will be parsed into the
--- type needed by the handler, but if it isn't present or cannot be
--- parsed, the handler will still be called (just with the 'Left'
--- variant).
+-- | Matches on query parameters of the given name. If there are no
+-- parameters, or it cannot be parsed into the type needed by the
+-- handler, it won't match.
+paramMany :: FromParam p => Text -> Req -> ([p] -> a) -> Maybe (Req, a)
+paramMany n req k =
+  let match = filter ((== T.encodeUtf8 n) . fst) (snd req)
+  in case map (maybe "" T.decodeUtf8 . snd) match of
+       [] -> Nothing
+       xs -> let ps = rights $ map fromParam xs in
+             if length ps == length xs
+                then Just (req, k ps)
+                else Nothing
+
+-- | If the specified parameters are present, they will be parsed into the
+-- type needed by the handler, but if they aren't present or cannot be
+-- parsed, the handler will still be called.
 paramOpt :: FromParam p =>
             Text ->
             Req ->
-            (Either Text p -> a) ->
+            (Either ParamError [p] -> a) ->
             Maybe (Req, a)
 paramOpt n req k =
-  let match = find ((== T.encodeUtf8 n) . fst) (snd req)
-      p = ((maybe "" T.decodeUtf8 . snd) <$> match)
-  in case p of
-       Nothing -> Just (req, k (Left "param missing"))
-       Just p' -> Just (req, k (fromParam p'))
+  let match = filter ((== T.encodeUtf8 n) . fst) (snd req)
+
+  in case map (maybe "" T.decodeUtf8 . snd) match of
+       [] -> Just (req, k (Left ParamMissing))
+       ps -> Just (req, k (foldLefts [] (map fromParam ps)))
+  where foldLefts acc [] = Right (reverse acc)
+        foldLefts _ (Left x : _) = Left x
+        foldLefts acc (Right x : xs) = foldLefts (x : acc) xs
 
 returnText :: Text -> Status -> ByteString -> IO (Maybe Response)
 returnText text status content =

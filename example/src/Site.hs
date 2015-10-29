@@ -120,13 +120,13 @@ dbHandler ctxt n =
 segmentHandler :: Ctxt -> Text -> IO (Maybe Response)
 segmentHandler _ seg = okText seg
 
-redisHandler :: Ctxt -> Text -> Either Text Text -> IO (Maybe Response)
+redisHandler :: Ctxt -> Text -> Either ParamError [Text] -> IO (Maybe Response)
 redisHandler ctxt key new =
   do res <- R.runRedis (ctxt ^. redis) $
               do let k = T.encodeUtf8 key
                  case new of
                    Left _ -> R.get k
-                   Right new' -> R.getset k (T.encodeUtf8 new')
+                   Right new' -> R.getset k (T.encodeUtf8 (head new'))
      case res of
        Left err ->
          errText (T.pack (show err))

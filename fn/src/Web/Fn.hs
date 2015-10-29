@@ -33,6 +33,7 @@ module Web.Fn ( -- * Application setup
               , (/?)
               , path
               , end
+              , anything
               , segment
               , FromParam(..)
               , ParamError(..)
@@ -52,11 +53,8 @@ module Web.Fn ( -- * Application setup
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
 import           Data.ByteString                    (ByteString)
 import           Data.Either                        (rights)
-import           Data.List                          (find)
 import           Data.Maybe                         (fromJust)
-import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
-import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as T
 import           Data.Text.Read                     (decimal, double)
 import           Network.HTTP.Types

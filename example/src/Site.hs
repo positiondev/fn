@@ -93,6 +93,7 @@ site ctxt =
              ,path "segment" // segment ==> segmentHandler
              ,path "redis" // segment /? paramOpt "set" ==> redisHandler
              ,path "session" ==> sessionHandler
+             ,anything ==> heistServe
              ]
     `fallthrough` notFoundText "Page not found."
 
@@ -143,3 +144,8 @@ sessionHandler ctxt =
                  Right (n,_) -> n
      putsess "visits" (T.pack (show (cur + 1 :: Int)))
      okText (T.pack (show cur))
+
+heistServe :: Ctxt -> IO (Maybe Response)
+heistServe ctxt =
+  let template = T.intercalate "/" (pathInfo $ _req ctxt) in
+  render ctxt template

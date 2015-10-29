@@ -187,6 +187,10 @@ end req k =
     [] -> Just (req, k)
     _ -> Nothing
 
+-- | Matches anything.
+anything :: Req -> a -> Maybe (Req, a)
+anything req k = Just (req, k)
+
 -- | Captures a part of the path. It will parse the part into the type
 -- specified by the handler it is matched to. If there is no segment, or
 -- if the segment cannot be parsed as such, it won't match.

@@ -33,6 +33,7 @@ module Web.Fn ( -- * Application setup
               , (/?)
               , path
               , end
+              , anything
               , segment
               , FromParam(..)
               , ParamError(..)
@@ -52,11 +53,8 @@ module Web.Fn ( -- * Application setup
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
 import           Data.ByteString                    (ByteString)
 import           Data.Either                        (rights)
-import           Data.List                          (find)
 import           Data.Maybe                         (fromJust)
-import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
-import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as T
 import           Data.Text.Read                     (decimal, double)
 import           Network.HTTP.Types
@@ -186,6 +184,10 @@ end req k =
   case fst req of
     [] -> Just (req, k)
     _ -> Nothing
+
+-- | Matches anything.
+anything :: Req -> a -> Maybe (Req, a)
+anything req k = Just (req, k)
 
 -- | Captures a part of the path. It will parse the part into the type
 -- specified by the handler it is matched to. If there is no segment, or

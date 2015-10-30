@@ -123,7 +123,8 @@ main = hspec $ do
       do (path "a" // end) (["a"],[]) () `shouldSatisfy` isJust
          (segment // end) (["a"],[]) (== ("a" :: Text))
                                      `shouldSatisfy` isJust
-
+    it "should match anything" $
+      do anything ([],[]) () `shouldSatisfy` isJust
 
   describe "parameter parsing" $
     do it "should parse Text" $

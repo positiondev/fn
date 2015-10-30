@@ -46,7 +46,7 @@ app ctxt =
 index :: IO (Maybe Response)
 index = okText "This is the index page! Try /foo/bar/baz?id=10"
 
-handler :: Ctxt -> Text -> Int -> IO (Maybe Response)
-handler _ fragment i = okText (fragment <> " - " <> T.pack (show i))
+handler :: Text -> Int -> Ctxt -> IO (Maybe Response)
+handler fragment i _ = okText (fragment <> " - " <> T.pack (show i))
 
 ```

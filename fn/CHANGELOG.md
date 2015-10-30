@@ -1,3 +1,14 @@
+* 0.1.3.0 Daniel Patterson <dbp@dbpmail.net> 2015-10-30
+
+  - Allow nested calls to `route`, by changing `Request` in
+    `ctxt`. This necesitated changing it so that the `ctxt` is passed
+    to handlers _last_, instead of first, because we need to have
+    completed matching before we can change the request.
+  - Add `anything` route matcher that matches anything.
+  - Add `paramMany` matcher that returns a list of values for the
+    given query param.
+  - Change `param` to fail if more than one value is in query string.
+
 * 0.1.2.0 Daniel Pattersion <dbp@dbpmail.net> 2015-10-27
 
   Rename `paramOptional` to `paramOpt`, to match `fn-extra`'s `Heist`

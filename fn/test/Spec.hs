@@ -18,7 +18,7 @@ instance RequestContext R where
 main :: IO ()
 main = hspec $ do
 
-  describe "routing" $ do
+  describe "matching" $ do
     it "should match first segment with path" $
       do path "foo" (["foo", "bar"], []) () `shouldSatisfy` isJust
          path "foo" ([], []) () `shouldSatisfy` isNothing
@@ -97,16 +97,16 @@ main = hspec $ do
       do (path "a" ==> const ())
            (R (["a"], []))
            `shouldSatisfy` isJust
-         (segment ==> \_ (_ :: Text) -> ())
+         (segment ==> \(_ :: Text) _ -> ())
             (R (["a"], []))
             `shouldSatisfy` isJust
-         (segment // path "b" ==> \_ x -> x == ("a" :: Text))
+         (segment // path "b" ==> \x _ -> x == ("a" :: Text))
            (R (["a", "b"], []))
            `shouldSatisfy` fromJust
-         (segment // path "b" ==> \_ x -> x == ("a" :: Text))
+         (segment // path "b" ==> \x _ -> x == ("a" :: Text))
            (R (["a", "a"], []))
            `shouldSatisfy` isNothing
-         (segment // path "b" ==> \_ x -> x == ("a" :: Text))
+         (segment // path "b" ==> \x _ -> x == ("a" :: Text))
            (R (["a"], []))
            `shouldSatisfy` isNothing
     it "should always pass a value with paramOpt" $
@@ -124,7 +124,15 @@ main = hspec $ do
          (segment // end) (["a"],[]) (== ("a" :: Text))
                                      `shouldSatisfy` isJust
     it "should match anything" $
-      do anything ([],[]) () `shouldSatisfy` isJust
+      anything ([],[]) () `shouldSatisfy` isJust
+
+  describe "route" $ do
+    it "should match route to parameter" $
+      do r <- route (R (["a"], [])) [segment ==> (\a _ -> if a == ("a"::Text) then okText "" else return Nothing)]
+         (responseStatus <$> r) `shouldSatisfy` isJust
+    it "should match nested routes" $
+      do r <- route (R (["a", "b"], [])) [path "a" ==> (\c -> route c [path "b" ==> const (okText "")])]
+         (responseStatus <$> r) `shouldSatisfy` isJust
 
   describe "parameter parsing" $
     do it "should parse Text" $

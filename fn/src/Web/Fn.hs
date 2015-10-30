@@ -138,15 +138,15 @@ type Req = ([Text], Query)
 -- patterns with varying numbers (and types) of parts with functions
 -- of the corresponding number of arguments and types.
 (==>) :: RequestContext ctxt =>
-         (Req -> k -> Maybe (Req, a)) ->
-         (ctxt -> k) ->
+         (Req -> k -> Maybe (Req, ctxt -> a)) ->
+         k ->
          ctxt -> Maybe a
 (match ==> handle) ctxt =
    let r = getRequest ctxt
        x = (pathInfo r, queryString r)
-   in case match x (handle ctxt) of
+   in case match x handle of
         Nothing -> Nothing
-        Just (_, action) -> Just action
+        Just ((pathInfo',_), action) -> Just (action (setRequest ctxt ((getRequest ctxt) { pathInfo = pathInfo' })))
 
 -- | Connects two path segments. Note that when normally used, the
 -- type parameter r is 'Req'. It is more general here to facilitate

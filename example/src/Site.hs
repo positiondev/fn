@@ -43,12 +43,19 @@ instance HeistContext Ctxt where
   heistLens = heist
 
 exampleSplices :: Splices (FnSplice Ctxt)
-exampleSplices =
-  tag "current-url" (attr "n" &= attrOpt "prefix") $ \ctxt _ rep pref ->
-    return $
-    replicate
-      rep
-      (X.TextNode (fromMaybe "" pref <> (T.decodeUtf8 . rawPathInfo $ ctxt ^. req)))
+exampleSplices = do
+  tag "current-url" (attr "n" &= attrOpt "prefix") currentUrlSplice
+  tag' "hello" helloSplice
+
+currentUrlSplice :: Ctxt -> X.Node -> Int -> Maybe Text -> FnSplice Ctxt
+currentUrlSplice ctxt _ rep pref =
+  let u = T.decodeUtf8 . rawPathInfo $ ctxt ^. req in
+  return $
+    replicate rep (X.TextNode (fromMaybe "" pref <> u))
+
+helloSplice :: Ctxt -> X.Node -> FnSplice Ctxt
+helloSplice _ _ = return [ X.TextNode "hello" ]
+
 
 initializer :: IO Ctxt
 initializer =

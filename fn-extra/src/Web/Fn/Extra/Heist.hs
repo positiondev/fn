@@ -27,6 +27,7 @@ module Web.Fn.Extra.Heist ( -- * Types
                           , renderWithSplices
                             -- * Building splices
                           , tag
+                          , tag'
                           , FromAttribute(..)
                           , attr
                           , attrOpt
@@ -160,6 +161,15 @@ tag name match handle =
                               name <> "'"
                              return []
                Just (_, a) -> a
+
+-- | A tag with no attributes.
+tag' :: Text ->
+        (ctxt -> X.Node -> FnSplice ctxt) ->
+        Splices (FnSplice ctxt)
+tag' name handle =
+  name ## do ctxt <- lift ask
+             node <- getParamNode
+             handle ctxt node
 
 
 -- | This combines two matchers together.

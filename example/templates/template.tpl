@@ -1,1 +1,7 @@
-<html><body><current-url n="2" prefix="x:"/></body></html>
+<html><body>
+
+  <p><current-url n="2" prefix="x:"/></p>
+
+  <p><hello /></p>
+
+</body></html>

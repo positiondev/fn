@@ -1,3 +1,7 @@
+* 0.1.3.1 Daniel Pattersion <dbp@dbpmail.net> 2015-10-31
+
+  - Add `method` matcher to match against HTTP method.
+
 * 0.1.3.0 Daniel Patterson <dbp@dbpmail.net> 2015-10-30
 
   - Allow nested calls to `route`, by changing `Request` in

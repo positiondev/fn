@@ -12,85 +12,98 @@ import           Web.Fn
 
 newtype R = R ([Text], Query)
 instance RequestContext R where
-  getRequest (R (p,q)) = defaultRequest { pathInfo = p, queryString = q }
+  getRequest (R (p',q')) = defaultRequest { pathInfo = p', queryString = q' }
   setRequest (R _) r = R (pathInfo r, queryString r)
+p :: [Text] -> Req
+p x = (x,[],GET)
+_p :: [Text] -> Req ->  Req
+_p x (_,q',m') = (x,q',m')
+q :: Query -> Req
+q x = ([],x,GET)
+_q :: Query -> Req -> Req
+_q x (p',_,m') = (p',x,m')
+m :: StdMethod -> Req
+m x = ([],[],x)
+_m :: StdMethod -> Req -> Req
+_m x (p',q',_) = (p',q',x)
+
 
 main :: IO ()
 main = hspec $ do
 
   describe "matching" $ do
     it "should match first segment with path" $
-      do path "foo" (["foo", "bar"], []) () `shouldSatisfy` isJust
-         path "foo" ([], []) () `shouldSatisfy` isNothing
-         path "foo" (["bar", "foo"], []) () `shouldSatisfy` isNothing
+      do path "foo" (p ["foo", "bar"]) () `shouldSatisfy` isJust
+         path "foo" (p []) () `shouldSatisfy` isNothing
+         path "foo" (p ["bar", "foo"]) () `shouldSatisfy` isNothing
     it "should match two paths combined with //" $
-      do (path "a" // path "b") (["a", "b"], []) () `shouldSatisfy` isJust
-         (path "b" // path "a") (["a", "b"], []) () `shouldSatisfy` isNothing
-         (path "b" // path "a") (["b"], []) () `shouldSatisfy` isNothing
+      do (path "a" // path "b") (p ["a", "b"]) () `shouldSatisfy` isJust
+         (path "b" // path "a") (p ["a", "b"]) () `shouldSatisfy` isNothing
+         (path "b" // path "a") (p ["b"]) () `shouldSatisfy` isNothing
     it "should pass url segment to segment" $
-      do segment (["a"], []) (== ("a" :: Text))
+      do segment (p ["a"]) (== ("a" :: Text))
                  `shouldSatisfy` (snd . fromJust)
-         segment ([], []) (id :: Text -> Text) `shouldSatisfy` isNothing
-         segment (["a", "b"], []) (== ("a" :: Text))
+         segment (p []) (id :: Text -> Text) `shouldSatisfy` isNothing
+         segment (p ["a", "b"]) (== ("a" :: Text))
                  `shouldSatisfy` (snd . fromJust)
     it "should match two segments combined with //" $
-      do (segment // segment) (["a", "b"],[]) (\a b -> a == ("a" :: Text) &&
-                                                       b == ("b" :: Text))
+      do (segment // segment) (p ["a", "b"]) (\a b -> a == ("a" :: Text) &&
+                                                      b == ("b" :: Text))
                               `shouldSatisfy` (snd . fromJust)
-         (segment // segment) ([], []) (\(_ :: Text) (_ :: Text) -> ())
+         (segment // segment) (p []) (\(_ :: Text) (_ :: Text) -> ())
                               `shouldSatisfy` isNothing
-         (segment // segment) (["a", "b", "c"], [])
+         (segment // segment) (p ["a", "b", "c"])
                               (\a b -> a == ("a" :: Text) &&
                                        b == ("b" :: Text))
                               `shouldSatisfy` (snd . fromJust)
     it "should match path and segment combined with //" $
-      do (path "a" // segment) (["a", "b"], []) (== ("b" :: Text))
+      do (path "a" // segment) (p ["a", "b"]) (== ("b" :: Text))
                                `shouldSatisfy` (snd . fromJust)
-         (path "a" // segment) (["b", "b"], []) (== ("b" :: Text))
+         (path "a" // segment) (p ["b", "b"]) (== ("b" :: Text))
                                `shouldSatisfy` isNothing
-         (segment // path "b") (["a", "b"], []) (== ("a" :: Text))
+         (segment // path "b") (p ["a", "b"]) (== ("a" :: Text))
                                `shouldSatisfy` (snd . fromJust)
     it "should match many segments and paths together" $
        do (path "a" // segment // path "c" // path "d")
-            (["a","b","c", "d"], [])
+            (p ["a","b","c", "d"])
             (== ("b" :: Text))
             `shouldSatisfy` (snd . fromJust)
           (segment // path "b" // segment // segment)
-            (["a","b","c", "d", "e"], [])
+            (p ["a","b","c", "d", "e"])
             (\a c d -> a == ("a" :: Text) &&
                        c == ("c" :: Text) &&
                        d == ("d" :: Text))
             `shouldSatisfy` (snd . fromJust)
           (segment // path "b" // segment)
-            (["a", "b"], []) (\(_ :: Text) (_ :: Text) -> True)
+            (p ["a", "b"]) (\(_ :: Text) (_ :: Text) -> True)
             `shouldSatisfy` isNothing
           (segment // path "a" // segment)
-            (["a", "b"], []) (\(_ :: Text) (_ :: Text) -> True)
+            (p ["a", "b"]) (\(_ :: Text) (_ :: Text) -> True)
             `shouldSatisfy` isNothing
     it "should match query parameters with param" $
-      do param "foo" ([], [("foo", Nothing)]) (== ("" :: Text))
+      do param "foo" (q [("foo", Nothing)]) (== ("" :: Text))
                      `shouldSatisfy` (snd . fromJust)
-         param "foo" ([], []) (\(_ :: Text) -> True) `shouldSatisfy` isNothing
+         param "foo" (q []) (\(_ :: Text) -> True) `shouldSatisfy` isNothing
     it "should match combined param and paths with /?" $
-      do (path "a" /? param "id") (["a"], [("id", Just "x")])
+      do (path "a" /? param "id") (_p ["a"] $ q [("id", Just "x")])
                                   (== ("x" :: Text))
                                   `shouldSatisfy` (snd . fromJust)
-         (path "a" /? param "id") (["b"], [("id", Just "x")])
+         (path "a" /? param "id") (_p ["b"] $ q [("id", Just "x")])
                                   (== ("x" :: Text))
                                   `shouldSatisfy` isNothing
-         (path "a" /? param "id") ([], [("id", Just "x")])
+         (path "a" /? param "id") (_p [] $ q [("id", Just "x")])
                          (== ("x" :: Text))
                          `shouldSatisfy` isNothing
-         (path "a" /? param "id") (["a"], [("di", Just "x")])
+         (path "a" /? param "id") (_p ["a"] $ q [("di", Just "x")])
                          (== ("x" :: Text))
                          `shouldSatisfy` isNothing
     it "should match combining param, path, segment" $
       do (path "a" // segment /? param "id")
-           (["a", "b"], [("id", Just "x")])
+           (_p ["a", "b"] $ q [("id", Just "x")])
            (\b x -> b == ("b" :: Text) && x == ("x" :: Text))
            `shouldSatisfy` (snd . fromJust)
          (path "a" // segment // segment /? param "id")
-           (["a", "b"], [("id", Just "x")])
+           (_p ["a", "b"] $ q [("id", Just "x")])
            (\(_ :: Text) (_ :: Text) (_ :: Text) -> True)
            `shouldSatisfy` isNothing
     it "should apply matchers with ==>" $
@@ -110,21 +123,26 @@ main = hspec $ do
            (R (["a"], []))
            `shouldSatisfy` isNothing
     it "should always pass a value with paramOpt" $
-      do paramOpt "id" ([], []) (isLeft :: Either ParamError [Text] -> Bool)
+      do paramOpt "id" (q []) (isLeft :: Either ParamError [Text] -> Bool)
                   `shouldSatisfy` (snd . fromJust)
-         paramOpt "id" ([], [("id", Just "foo")])
+         paramOpt "id" (q [("id", Just "foo")])
                        (== Right (["foo"] :: [Text]))
                        `shouldSatisfy` (snd . fromJust)
     it "should match end against no further path segments" $
-      do end ([],[]) () `shouldSatisfy` isJust
-         end ([],[("foo", Nothing)]) () `shouldSatisfy` isJust
-         end (["a"],[]) () `shouldSatisfy` isNothing
+      do end (p []) () `shouldSatisfy` isJust
+         end (_p [] $ q [("foo", Nothing)]) () `shouldSatisfy` isJust
+         end (p ["a"]) () `shouldSatisfy` isNothing
     it "should match end after path and segments" $
-      do (path "a" // end) (["a"],[]) () `shouldSatisfy` isJust
-         (segment // end) (["a"],[]) (== ("a" :: Text))
-                                     `shouldSatisfy` isJust
+      do (path "a" // end) (p ["a"]) () `shouldSatisfy` isJust
+         (segment // end) (p ["a"]) (== ("a" :: Text))
+                                    `shouldSatisfy` isJust
     it "should match anything" $
-      anything ([],[]) () `shouldSatisfy` isJust
+      do anything (p []) () `shouldSatisfy` isJust
+         anything (p ["f","b"]) () `shouldSatisfy` isJust
+
+    it "should match against method" $
+       do (method GET) (m GET) () `shouldSatisfy` isJust
+          (method GET) (m POST) () `shouldSatisfy` isNothing
 
   describe "route" $ do
     it "should match route to parameter" $

@@ -35,6 +35,7 @@ module Web.Fn ( -- * Application setup
               , end
               , anything
               , segment
+              , method
               , FromParam(..)
               , ParamError(..)
               , param
@@ -130,7 +131,7 @@ route ctxt (x:xs) =
            Just response -> return (Just response)
 
 -- | The parts of the path, when split on /, and the query.
-type Req = ([Text], Query)
+type Req = ([Text], Query, StdMethod)
 
 -- | The connective between route patterns and the handler that will
 -- be called if the pattern matches. The type is not particularly
@@ -143,10 +144,11 @@ type Req = ([Text], Query)
          ctxt -> Maybe a
 (match ==> handle) ctxt =
    let r = getRequest ctxt
-       x = (pathInfo r, queryString r)
+       m = either (const GET) id (parseMethod (requestMethod r))
+       x = (pathInfo r, queryString r, m)
    in case match x handle of
         Nothing -> Nothing
-        Just ((pathInfo',_), action) -> Just (action (setRequest ctxt ((getRequest ctxt) { pathInfo = pathInfo' })))
+        Just ((pathInfo',_,_), action) -> Just (action (setRequest ctxt ((getRequest ctxt) { pathInfo = pathInfo' })))
 
 -- | Connects two path segments. Note that when normally used, the
 -- type parameter r is 'Req'. It is more general here to facilitate
@@ -173,16 +175,16 @@ type Req = ([Text], Query)
 -- left, or the next part does not match, the whole match fails.
 path :: Text -> Req -> a -> Maybe (Req, a)
 path s req k =
-  case fst req of
-    (x:xs) | x == s -> Just ((xs, snd req), k)
+  case req of
+    (x:xs,q,m) | x == s -> Just ((xs, q, m), k)
     _               -> Nothing
 
 -- | Matches there being no parts of the path left. This is useful when
 -- matching index routes.
 end :: Req -> a -> Maybe (Req, a)
 end req k =
-  case fst req of
-    [] -> Just (req, k)
+  case req of
+    ([],_,_) -> Just (req, k)
     _ -> Nothing
 
 -- | Matches anything.
@@ -194,11 +196,16 @@ anything req k = Just (req, k)
 -- if the segment cannot be parsed as such, it won't match.
 segment :: FromParam p => Req -> (p -> a) -> Maybe (Req, a)
 segment req k =
-  case fst req of
-    (x:xs) -> case fromParam x of
-                Left _ -> Nothing
-                Right p -> Just ((xs, snd req), k p)
+  case req of
+    (x:xs,q,m) -> case fromParam x of
+                    Left _ -> Nothing
+                    Right p -> Just ((xs, q, m), k p)
     _     -> Nothing
+
+-- | Matches on a particular HTTP method.
+method :: StdMethod -> Req -> a -> Maybe (Req, a)
+method m r@(_,_,m') a | m == m' = Just (r, a)
+method _ _ _ = Nothing
 
 data ParamError = ParamMissing | ParamUnparsable | ParamOtherError Text deriving (Eq, Show)
 
@@ -227,7 +234,8 @@ instance FromParam Double where
 -- handler, it won't match.
 param :: FromParam p => Text -> Req -> (p -> a) -> Maybe (Req, a)
 param n req k =
-  let match = filter ((== T.encodeUtf8 n) . fst) (snd req)
+  let (_,q,_) = req
+      match = filter ((== T.encodeUtf8 n) . fst) q
   in case rights (map (fromParam . maybe "" T.decodeUtf8 . snd) match) of
        [x] -> Just (req, k x)
        _ -> Nothing
@@ -237,7 +245,8 @@ param n req k =
 -- handler, it won't match.
 paramMany :: FromParam p => Text -> Req -> ([p] -> a) -> Maybe (Req, a)
 paramMany n req k =
-  let match = filter ((== T.encodeUtf8 n) . fst) (snd req)
+  let (_,q,_) = req
+      match = filter ((== T.encodeUtf8 n) . fst) q
   in case map (maybe "" T.decodeUtf8 . snd) match of
        [] -> Nothing
        xs -> let ps = rights $ map fromParam xs in
@@ -254,8 +263,8 @@ paramOpt :: FromParam p =>
             (Either ParamError [p] -> a) ->
             Maybe (Req, a)
 paramOpt n req k =
-  let match = filter ((== T.encodeUtf8 n) . fst) (snd req)
-
+  let (_,q,_) = req
+      match = filter ((== T.encodeUtf8 n) . fst) q
   in case map (maybe "" T.decodeUtf8 . snd) match of
        [] -> Just (req, k (Left ParamMissing))
        ps -> Just (req, k (foldLefts [] (map fromParam ps)))

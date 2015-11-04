@@ -1,5 +1,5 @@
 name:                fn
-version:             0.1.3.1
+version:             0.1.4.0
 synopsis:            A functional web framework.
 description:         Please see README.
 homepage:            http://github.com/dbp/fn#readme

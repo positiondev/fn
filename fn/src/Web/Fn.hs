@@ -139,73 +139,74 @@ type Req = ([Text], Query, StdMethod)
 -- patterns with varying numbers (and types) of parts with functions
 -- of the corresponding number of arguments and types.
 (==>) :: RequestContext ctxt =>
-         (Req -> k -> Maybe (Req, ctxt -> a)) ->
-         k ->
-         ctxt -> Maybe a
+         (Req -> Maybe (Req, k -> a)) ->
+         (ctxt -> k) ->
+         ctxt ->
+         Maybe a
 (match ==> handle) ctxt =
    let r = getRequest ctxt
        m = either (const GET) id (parseMethod (requestMethod r))
        x = (pathInfo r, queryString r, m)
-   in case match x handle of
+   in case match x of
         Nothing -> Nothing
-        Just ((pathInfo',_,_), action) -> Just (action (setRequest ctxt ((getRequest ctxt) { pathInfo = pathInfo' })))
+        Just ((pathInfo',_,_), k) -> Just (k $ handle (setRequest ctxt ((getRequest ctxt) { pathInfo = pathInfo' })))
 
 -- | Connects two path segments. Note that when normally used, the
 -- type parameter r is 'Req'. It is more general here to facilitate
 -- testing.
-(//) :: (r -> k -> Maybe (r, k')) ->
-        (r -> k' -> Maybe (r, a)) ->
-        r ->
-        k -> Maybe (r, a)
-(match1 // match2) req k =
-   case match1 req k of
+(//) :: (r -> Maybe (r, k -> k')) ->
+        (r -> Maybe (r, k' -> a)) ->
+        r -> Maybe (r, k -> a)
+(match1 // match2) req =
+   case match1 req of
      Nothing -> Nothing
-     Just (req', k') -> match2 req' k'
+     Just (req', k) -> case match2 req' of
+                         Nothing -> Nothing
+                         Just (req'', k') -> Just (req'', k' . k)
 
 -- | Identical to '(//)', provided simply because it serves as a
 -- nice visual difference when switching from 'path'/'segment' to
 -- 'param' and friends.
-(/?) :: (r -> k -> Maybe (r, k')) ->
-        (r -> k' -> Maybe (r, a)) ->
-        r ->
-        k -> Maybe (r, a)
+(/?) :: (r -> Maybe (r, k -> k')) ->
+        (r -> Maybe (r, k' -> a)) ->
+        r -> Maybe (r, k -> a)
 (/?) = (//)
 
 -- | Matches a literal part of the path. If there is no path part
 -- left, or the next part does not match, the whole match fails.
-path :: Text -> Req -> a -> Maybe (Req, a)
-path s req k =
+path :: Text -> Req -> Maybe (Req, a -> a)
+path s req =
   case req of
-    (x:xs,q,m) | x == s -> Just ((xs, q, m), k)
+    (x:xs,q,m) | x == s -> Just ((xs, q, m), id)
     _               -> Nothing
 
 -- | Matches there being no parts of the path left. This is useful when
 -- matching index routes.
-end :: Req -> a -> Maybe (Req, a)
-end req k =
+end :: Req -> Maybe (Req, a -> a)
+end req =
   case req of
-    ([],_,_) -> Just (req, k)
+    ([],_,_) -> Just (req, id)
     _ -> Nothing
 
 -- | Matches anything.
-anything :: Req -> a -> Maybe (Req, a)
-anything req k = Just (req, k)
+anything :: Req -> Maybe (Req, a -> a)
+anything req = Just (req, id)
 
 -- | Captures a part of the path. It will parse the part into the type
 -- specified by the handler it is matched to. If there is no segment, or
 -- if the segment cannot be parsed as such, it won't match.
-segment :: FromParam p => Req -> (p -> a) -> Maybe (Req, a)
-segment req k =
+segment :: FromParam p => Req ->  Maybe (Req, (p -> a) -> a)
+segment req =
   case req of
     (x:xs,q,m) -> case fromParam x of
                     Left _ -> Nothing
-                    Right p -> Just ((xs, q, m), k p)
+                    Right p -> Just ((xs, q, m), \k -> k p)
     _     -> Nothing
 
 -- | Matches on a particular HTTP method.
-method :: StdMethod -> Req -> a -> Maybe (Req, a)
-method m r@(_,_,m') a | m == m' = Just (r, a)
-method _ _ _ = Nothing
+method :: StdMethod -> Req -> Maybe (Req, a -> a)
+method m r@(_,_,m') | m == m' = Just (r, id)
+method _ _ = Nothing
 
 data ParamError = ParamMissing | ParamUnparsable | ParamOtherError Text deriving (Eq, Show)
 
@@ -232,26 +233,26 @@ instance FromParam Double where
 -- | Matches on a single query parameter of the given name. If there is no
 -- parameters, or it cannot be parsed into the type needed by the
 -- handler, it won't match.
-param :: FromParam p => Text -> Req -> (p -> a) -> Maybe (Req, a)
-param n req k =
+param :: FromParam p => Text -> Req -> Maybe (Req, (p -> a) -> a)
+param n req =
   let (_,q,_) = req
       match = filter ((== T.encodeUtf8 n) . fst) q
   in case rights (map (fromParam . maybe "" T.decodeUtf8 . snd) match) of
-       [x] -> Just (req, k x)
+       [x] -> Just (req, \k -> k x)
        _ -> Nothing
 
 -- | Matches on query parameters of the given name. If there are no
 -- parameters, or it cannot be parsed into the type needed by the
 -- handler, it won't match.
-paramMany :: FromParam p => Text -> Req -> ([p] -> a) -> Maybe (Req, a)
-paramMany n req k =
+paramMany :: FromParam p => Text -> Req -> Maybe (Req, ([p] -> a) -> a)
+paramMany n req =
   let (_,q,_) = req
       match = filter ((== T.encodeUtf8 n) . fst) q
   in case map (maybe "" T.decodeUtf8 . snd) match of
        [] -> Nothing
        xs -> let ps = rights $ map fromParam xs in
              if length ps == length xs
-                then Just (req, k ps)
+                then Just (req, \k -> k ps)
                 else Nothing
 
 -- | If the specified parameters are present, they will be parsed into the
@@ -260,14 +261,13 @@ paramMany n req k =
 paramOpt :: FromParam p =>
             Text ->
             Req ->
-            (Either ParamError [p] -> a) ->
-            Maybe (Req, a)
-paramOpt n req k =
+            Maybe (Req, (Either ParamError [p] -> a) -> a)
+paramOpt n req =
   let (_,q,_) = req
       match = filter ((== T.encodeUtf8 n) . fst) q
   in case map (maybe "" T.decodeUtf8 . snd) match of
-       [] -> Just (req, k (Left ParamMissing))
-       ps -> Just (req, k (foldLefts [] (map fromParam ps)))
+       [] -> Just (req, \k -> k (Left ParamMissing))
+       ps -> Just (req, \k -> k (foldLefts [] (map fromParam ps)))
   where foldLefts acc [] = Right (reverse acc)
         foldLefts _ (Left x : _) = Left x
         foldLefts acc (Right x : xs) = foldLefts (x : acc) xs

@@ -1,3 +1,8 @@
+* 0.1.4.0 Daniel Pattersion <dbp@dbpmail.net> 2015-11-4
+
+  - Move `ctxt` back to first parameter passed to handlers, via more
+    continuations.
+
 * 0.1.3.1 Daniel Pattersion <dbp@dbpmail.net> 2015-10-31
 
   - Add `method` matcher to match against HTTP method.

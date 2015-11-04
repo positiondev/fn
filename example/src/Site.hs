@@ -109,8 +109,8 @@ indexHandler _ =
   okText ("Try /param?id=123, /template, /db?number=123, /segment/foo,"
             <> " /redis/key, /redis/key?set=new, or /session")
 
-paramHandler :: Int -> Ctxt -> IO (Maybe Response)
-paramHandler i _ =
+paramHandler :: Ctxt -> Int  -> IO (Maybe Response)
+paramHandler _ i =
   okText (T.pack (show i))
 
 templateHandler :: Ctxt -> IO (Maybe Response)
@@ -120,16 +120,16 @@ templateHandler ctxt =
        Nothing -> okText "Could not find template. Did you start application from example directory?"
        Just _ -> return t
 
-dbHandler :: Int -> Ctxt -> IO (Maybe Response)
-dbHandler n ctxt =
+dbHandler :: Ctxt -> Int ->  IO (Maybe Response)
+dbHandler ctxt n =
   do r <- withResource (ctxt ^. db) $ \c -> PG.query c "select ?" (PG.Only n)
      okText (T.pack (show (r :: [[Int]])))
 
-segmentHandler :: Text ->  Ctxt -> IO (Maybe Response)
-segmentHandler seg _ = okText seg
+segmentHandler :: Ctxt -> Text ->  IO (Maybe Response)
+segmentHandler _ seg = okText seg
 
-redisHandler :: Text -> Either ParamError [Text] -> Ctxt -> IO (Maybe Response)
-redisHandler key new ctxt  =
+redisHandler :: Ctxt -> Text -> Either ParamError [Text] -> IO (Maybe Response)
+redisHandler ctxt key new =
   do res <- R.runRedis (ctxt ^. redis) $
               do let k = T.encodeUtf8 key
                  case new of

@@ -27,13 +27,17 @@ m x = ([],[],x)
 _m :: StdMethod -> Req -> Req
 _m x (p',q',_) = (p',q',x)
 
-j m = fst <$> m `shouldSatisfy` isJust
-n m = fst <$> m `shouldSatisfy` isNothing
+j :: Show a => Maybe (a,b) -> Expectation
+j mv = fst <$> mv `shouldSatisfy` isJust
+n :: Show a => Maybe (a,b) -> Expectation
+n mv = fst <$> mv `shouldSatisfy` isNothing
 
-v m f = snd (fromJust m) f `shouldBe` True
-vn m f = case m of
-           Nothing -> 1 `shouldBe` 1
-           Just (_,k) -> k f `shouldBe` False
+v :: Maybe (a, t -> Bool) -> t -> Expectation
+v mv f = snd (fromJust mv) f `shouldBe` True
+vn :: Maybe (a, t -> Bool) -> t -> Expectation
+vn mv f = case mv of
+            Nothing -> (1 :: Int) `shouldBe` 1
+            Just (_,k) -> k f `shouldBe` False
 
 t1 :: Text -> Text -> Bool
 t1 = (==)

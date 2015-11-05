@@ -23,6 +23,7 @@ module Web.Fn.Extra.Heist ( -- * Types
                             -- * Initializer
                           , heistInit
                             -- * Rendering templates
+                          , heistServe
                           , render
                           , renderWithSplices
                             -- * Building splices
@@ -50,6 +51,7 @@ import           Network.HTTP.Types
 import           Network.Wai
 import qualified Network.Wai.Util           as W
 import qualified Text.XmlHtml               as X
+import           Web.Fn
 
 -- | The type of our state. We need a ReaderT to be able to pass the
 -- runtime context (which includes the current request) into the
@@ -62,18 +64,9 @@ type FnHeistState ctxt = HeistState (ReaderT ctxt IO)
 type FnSplice ctxt = Splice (ReaderT ctxt IO)
 
 -- | In order to have render be able to get the 'FnHeistState' out of
--- our context, we need this helper class. The easiest way to
--- instantiate it is with the 'heistLens', but if you prefer you can
--- use 'getHeist' and 'setHeist' instead (one of these must be
--- provided).
+-- our context, we need this helper class.
 class HeistContext ctxt where
-  heistLens :: Functor f => (FnHeistState ctxt -> f (FnHeistState ctxt)) ->
-                            ctxt -> f ctxt
-  heistLens f c = setHeist c <$> f (getHeist c)
   getHeist :: ctxt -> FnHeistState ctxt
-  getHeist = view heistLens
-  setHeist :: ctxt -> FnHeistState ctxt -> ctxt
-  setHeist c r = set heistLens r c
 
 -- | Initialize heist. This takes a list of paths to template
 -- directories and a set of interpreted splices. Currently, we don't
@@ -90,6 +83,25 @@ heistInit templateLocations splices =
                                     & hcLoadTimeSplices .~ defaultLoadTimeSplices
                                     & hcNamespace .~ "")
 
+-- | Render templates according to the request path. Note that if you
+-- have matched some parts of the path, those will not be included in
+-- the path used to find the templates. For example, if you have
+-- 'foo/bar.tpl' in the directory where you loaded templates from,
+--
+-- > path "foo" ==> heistServe
+--
+-- Will match @foo/foo/bar@, but not @foo/bar@. To match that, you could:
+--
+-- > anything ==> heistServe
+--
+-- If no template is found, this will continue routing.
+heistServe :: (RequestContext ctxt, HeistContext ctxt) =>
+              ctxt ->
+              IO (Maybe Response)
+heistServe ctxt =
+  let p = pathInfo $ getRequest ctxt in
+  render ctxt (T.intercalate "/" p)
+
 -- | Render a single template by name.
 render :: HeistContext ctxt =>
           ctxt ->
@@ -105,7 +117,7 @@ renderWithSplices :: HeistContext ctxt =>
                      Splices (FnSplice ctxt) ->
                      IO (Maybe Response)
 renderWithSplices ctxt name splices =
-  do r <- runReaderT (renderTemplate (bindSplices splices (ctxt ^. heistLens)) (T.encodeUtf8 name)) ctxt
+  do r <- runReaderT (renderTemplate (bindSplices splices (getHeist ctxt)) (T.encodeUtf8 name)) ctxt
      case first toLazyByteString <$> r of
        Nothing -> return Nothing
        Just (h,m) -> Just <$> W.bytestring status200 [(hContentType, m)] h

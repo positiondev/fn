@@ -29,6 +29,7 @@ library
                      , bytestring
                      , lens
                      , either
+                     , fn
   default-language:    Haskell2010
   ghc-options:         -Wall
 

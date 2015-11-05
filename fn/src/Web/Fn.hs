@@ -42,6 +42,7 @@ module Web.Fn ( -- * Application setup
               , paramMany
               , paramOpt
                 -- * Responses
+              , staticServe
               , okText
               , okHtml
               , errText
@@ -54,12 +55,16 @@ module Web.Fn ( -- * Application setup
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
 import           Data.ByteString                    (ByteString)
 import           Data.Either                        (rights)
+import qualified Data.HashMap.Strict                as HM
 import           Data.Maybe                         (fromJust)
 import           Data.Text                          (Text)
+import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as T
 import           Data.Text.Read                     (decimal, double)
 import           Network.HTTP.Types
 import           Network.Wai
+import           System.Directory                   (doesFileExist)
+import           System.FilePath                    (takeExtension)
 
 data Store b a = Store b (b -> a)
 instance Functor (Store b) where
@@ -84,24 +89,16 @@ class RequestContext ctxt where
     let (Store _ b) = requestLens (`Store` id) c
     in b r
 
+instance RequestContext Request where
+  getRequest = id
+  setRequest _ = id
+
 -- | Convert an Fn application (provide a context, a context to response
 -- function and we'll create a WAI application by updating the Request
 -- value for each call).
 toWAI :: RequestContext ctxt => ctxt -> (ctxt -> IO Response) -> Application
 toWAI ctxt f req cont = let ctxt' = setRequest ctxt req
                         in f ctxt' >>= cont
-
--- | The 'route' function (and all your handlers) return
--- 'IO (Maybe Response)', because each can elect to not respond (in
--- which case we will continue to match on routes). But to construct
--- an application, we need a response in the case that nothing matched
--- - this is what 'fallthrough' does.
-fallthrough :: IO (Maybe Response) -> IO Response -> IO Response
-fallthrough a ft =
-  do response <- a
-     case response of
-       Nothing -> ft
-       Just r -> return r
 
 -- | The main construct for Fn, 'route' takes a context (which it will pass
 -- to all handlers) and a list of potential matches (which, once they
@@ -129,6 +126,109 @@ route ctxt (x:xs) =
          case resp of
            Nothing -> route ctxt xs
            Just response -> return (Just response)
+
+-- | The 'route' function (and all your handlers) return
+-- 'IO (Maybe Response)', because each can elect to not respond (in
+-- which case we will continue to match on routes). But to construct
+-- an application, we need a response in the case that nothing matched
+-- - this is what 'fallthrough' does.
+fallthrough :: IO (Maybe Response) -> IO Response -> IO Response
+fallthrough a ft =
+  do response <- a
+     case response of
+       Nothing -> ft
+       Just r -> return r
+
+-- NOTE(dbp 2015-11-05): This list taken from snap-core, BSD3 licensed.
+mimeMap :: HM.HashMap String ByteString
+mimeMap =  HM.fromList [
+  ( ".asc"     , "text/plain"                        ),
+  ( ".asf"     , "video/x-ms-asf"                    ),
+  ( ".asx"     , "video/x-ms-asf"                    ),
+  ( ".avi"     , "video/x-msvideo"                   ),
+  ( ".bz2"     , "application/x-bzip"                ),
+  ( ".c"       , "text/plain"                        ),
+  ( ".class"   , "application/octet-stream"          ),
+  ( ".conf"    , "text/plain"                        ),
+  ( ".cpp"     , "text/plain"                        ),
+  ( ".css"     , "text/css"                          ),
+  ( ".cxx"     , "text/plain"                        ),
+  ( ".dtd"     , "text/xml"                          ),
+  ( ".dvi"     , "application/x-dvi"                 ),
+  ( ".gif"     , "image/gif"                         ),
+  ( ".gz"      , "application/x-gzip"                ),
+  ( ".hs"      , "text/plain"                        ),
+  ( ".htm"     , "text/html"                         ),
+  ( ".html"    , "text/html"                         ),
+  ( ".ico"     , "image/x-icon"                      ),
+  ( ".jar"     , "application/x-java-archive"        ),
+  ( ".jpeg"    , "image/jpeg"                        ),
+  ( ".jpg"     , "image/jpeg"                        ),
+  ( ".js"      , "text/javascript"                   ),
+  ( ".json"    , "application/json"                  ),
+  ( ".log"     , "text/plain"                        ),
+  ( ".m3u"     , "audio/x-mpegurl"                   ),
+  ( ".mov"     , "video/quicktime"                   ),
+  ( ".mp3"     , "audio/mpeg"                        ),
+  ( ".mpeg"    , "video/mpeg"                        ),
+  ( ".mpg"     , "video/mpeg"                        ),
+  ( ".ogg"     , "application/ogg"                   ),
+  ( ".pac"     , "application/x-ns-proxy-autoconfig" ),
+  ( ".pdf"     , "application/pdf"                   ),
+  ( ".png"     , "image/png"                         ),
+  ( ".ps"      , "application/postscript"            ),
+  ( ".qt"      , "video/quicktime"                   ),
+  ( ".sig"     , "application/pgp-signature"         ),
+  ( ".spl"     , "application/futuresplash"          ),
+  ( ".svg"     , "image/svg+xml"                     ),
+  ( ".swf"     , "application/x-shockwave-flash"     ),
+  ( ".tar"     , "application/x-tar"                 ),
+  ( ".tar.bz2" , "application/x-bzip-compressed-tar" ),
+  ( ".tar.gz"  , "application/x-tgz"                 ),
+  ( ".tbz"     , "application/x-bzip-compressed-tar" ),
+  ( ".text"    , "text/plain"                        ),
+  ( ".tgz"     , "application/x-tgz"                 ),
+  ( ".torrent" , "application/x-bittorrent"          ),
+  ( ".ttf"     , "application/x-font-truetype"       ),
+  ( ".txt"     , "text/plain"                        ),
+  ( ".wav"     , "audio/x-wav"                       ),
+  ( ".wax"     , "audio/x-ms-wax"                    ),
+  ( ".wma"     , "audio/x-ms-wma"                    ),
+  ( ".wmv"     , "video/x-ms-wmv"                    ),
+  ( ".xbm"     , "image/x-xbitmap"                   ),
+  ( ".xml"     , "text/xml"                          ),
+  ( ".xpm"     , "image/x-xpixmap"                   ),
+  ( ".xwd"     , "image/x-xwindowdump"               ),
+  ( ".zip"     , "application/zip"                   ) ]
+
+
+-- | Serves static files out of the specified path according to the
+-- request path. Note that if you have matched parts of the path,
+-- those will not be included in the path used to find the static
+-- file. For example, if you have a file @static/img/a.png@, and do:
+--
+-- > path "img" ==> staticServe "static"
+--
+-- It will match @img/img/a.png@, not @img/a.png@. If you wanted that,
+-- you could:
+--
+-- > anything ==> staticServe "static"
+--
+-- If no file is found, this will continue routing.
+staticServe :: RequestContext ctxt => Text -> ctxt -> IO (Maybe Response)
+staticServe d ctxt = do
+  let pth = T.unpack $ T.intercalate "/" $  d : pathInfo (getRequest ctxt)
+  exists <- doesFileExist pth
+  if exists
+     then do let ext = takeExtension pth
+                 contentType = case HM.lookup ext mimeMap of
+                                 Nothing -> []
+                                 Just t -> [(hContentType, t)]
+             return $ Just $ responseFile status200
+                                          contentType
+                                          pth
+                                          Nothing
+     else return Nothing
 
 -- | The parts of the path, when split on /, and the query.
 type Req = ([Text], Query, StdMethod)

@@ -40,7 +40,7 @@ instance RequestContext Ctxt where
   requestLens = req
 
 instance HeistContext Ctxt where
-  heistLens = heist
+  getHeist = _heist
 
 exampleSplices :: Splices (FnSplice Ctxt)
 exampleSplices = do
@@ -101,13 +101,14 @@ site ctxt =
              ,path "redis" // segment /? paramOpt "set" ==> redisHandler
              ,path "session" ==> sessionHandler
              ,anything ==> heistServe
+             ,anything ==> staticServe "static"
              ]
     `fallthrough` notFoundText "Page not found."
 
 indexHandler :: Ctxt -> IO (Maybe Response)
 indexHandler _ =
   okText ("Try /param?id=123, /template, /db?number=123, /segment/foo,"
-            <> " /redis/key, /redis/key?set=new, or /session")
+       <> " /redis/key, /redis/key?set=new, /session, or /haskell.png")
 
 paramHandler :: Ctxt -> Int  -> IO (Maybe Response)
 paramHandler _ i =
@@ -151,8 +152,3 @@ sessionHandler ctxt =
                  Right (n,_) -> n
      putsess "visits" (T.pack (show (cur + 1 :: Int)))
      okText (T.pack (show cur))
-
-heistServe :: Ctxt -> IO (Maybe Response)
-heistServe ctxt =
-  let template = T.intercalate "/" (pathInfo $ _req ctxt) in
-  render ctxt template

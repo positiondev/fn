@@ -5,48 +5,6 @@
 
 ## Example
 
-See the example application in the repository for a full usage, but a minimal application is the following:
-
-```
-
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-
-import           Control.Lens
-import           Data.Monoid
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import           Network.HTTP.Types
-import           Network.Wai
-import           Network.Wai.Handler.Warp
-import qualified Network.Wai.Util         as W
-import           Web.Fn
-
-data Ctxt = Ctxt { _req :: Request
-                 }
-
-makeLenses ''Ctxt
-
-instance RequestContext Ctxt where
-  requestLens = req
-
-initializer :: IO Ctxt
-initializer = return (Ctxt defaultRequest)
-
-main :: IO ()
-main = do context <- initializer
-          run 8000 $ toWAI context app
-
-app :: Ctxt -> IO Response
-app ctxt =
-  route ctxt [ end ==> index
-             , path "foo" // segment // path "baz" /? param "id" ==> handler]
-    `fallthrough` notFoundText "Page not found."
-
-index :: IO (Maybe Response)
-index = okText "This is the index page! Try /foo/bar/baz?id=10"
-
-handler :: Text -> Int -> Ctxt -> IO (Maybe Response)
-handler fragment i _ = okText (fragment <> " - " <> T.pack (show i))
-
-```
+See the [example application](https://github.com/dbp/fn/tree/master/example)
+in the repository for a full usage including database access, heist
+templates, sessions, etc.

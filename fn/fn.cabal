@@ -1,7 +1,73 @@
 name:                fn
 version:             0.1.4.0
 synopsis:            A functional web framework.
-description:         Please see README.
+description:
+  A Haskell web framework where web handlers are just plain functions that
+  return IO and parameters are typed arguments to those functions.
+  .
+  @
+    #!\/usr\/bin\/env stack
+    \-\- stack --resolver lts-3.10 --install-ghc runghc --package fn
+    &#123;-&#35; LANGUAGE OverloadedStrings &#35;-&#125;
+    import Data.Monoid ((&#60;&#62;))
+    import Data.Text (Text)
+    import Network.Wai (Request, defaultRequest, Response)
+    import Network.Wai.Handler.Warp (run)
+    import Web.Fn
+    .
+    data Ctxt = Ctxt &#123; _req :: Request &#125;
+    instance RequestContext Ctxt where
+    &#32; getRequest = _req
+    &#32; setRequest c r = c &#123; _req = r &#125;
+    .
+    initializer :: IO Ctxt
+    initializer = return (Ctxt defaultRequest)
+    .
+    main :: IO ()
+    main = do ctxt <- initializer
+    &#32;         run 3000 $ toWAI ctxt site
+    .
+    site :: Ctxt -> IO Response
+    site ctxt = route ctxt [ end                        ==> indexH
+    &#32;                      , path &#34;echo&#34; \/? param &#34;msg&#34; ==> echoH
+    &#32;                      , path &#34;echo&#34; \/\/ segment     ==> echoH
+    &#32;                      ]
+    &#32;                 \`fallthrough\` notFoundText &#34;Page not found.&#34;
+    .
+    indexH :: Ctxt -> IO (Maybe Response)
+    indexH _ = okText &#34;Try visiting \/echo?msg='hello' or \/echo\/hello&#34;
+    .
+    echoH :: Ctxt -> Text -> IO (Maybe Response)
+    echoH _ msg = okText $ &#34;Echoing '&#34; &#60;&#62; msg &#60;&#62; &#34;'.&#34;
+
+  @
+  .
+  /provided you have/ <https://github.com/commercialhaskell/stack#readme stack> /installed, you can run this example like a shell script./
+  .
+  .
+  Fn lets you write web code that just looks like normal Haskell code.
+  .
+    * An application has some \"context\", which must contain a @Request@,
+      but can contain other data as well, like database connection pools,
+      etc. This context will be passed to each of your handlers, updated
+      with the current HTTP Request.
+  .
+    * Routes are declared to capture parameters and/or segments of the url,
+      and then routed to handler functions that have the appropriate number
+      and type of arguments. These functions return @IO (Maybe Response)@,
+      where @Nothing@ indicates to Fn that you want it to keep looking for
+      matching routes.
+  .
+    * All handlers just use plain old @IO@, which means it is easy to call
+      them from GHCi, @forkIO@, etc.
+  .
+    * All of this is a small wrapper around the WAI interface, so you have
+      the flexilibility to do anything you need to do with HTTP.
+  .
+  The name comes from the fact that Fn emphasizes functions (over monads),
+  where all necessary data is passed via function arguments, and control
+  flow is mediated by return values.
+
 homepage:            http://github.com/dbp/fn#readme
 license:             ISC
 license-file:        LICENSE

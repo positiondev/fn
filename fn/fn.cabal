@@ -67,7 +67,7 @@ description:
   where all necessary data is passed via function arguments, and control
   flow is mediated by return values.
 
-homepage:            http://github.cxom/dbp/fn#readme
+homepage:            http://github.com/dbp/fn#readme
 license:             ISC
 license-file:        LICENSE
 author:              Daniel Patterson <dbp@dbpmail.net>

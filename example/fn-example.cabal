@@ -22,6 +22,7 @@ executable fn-example
                      , fn-extra
                      , warp
                      , wai
+                     , http-types
                      , lens
                      , text
                      , heist
@@ -49,6 +50,7 @@ test-suite fn-example-test
                      , fn-extra
                      , warp
                      , wai
+                     , http-types
                      , lens
                      , text
                      , heist

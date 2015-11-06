@@ -1,9 +1,10 @@
 name:                fn
-version:             0.1.4.0
+version:             0.2.0.0
 synopsis:            A functional web framework.
 description:
-  A Haskell web framework where web handlers are just plain functions that
-  return IO and parameters are typed arguments to those functions.
+  A Haskell web framework where you write plain old functions.
+  .
+  /Provided you have/ <https://github.com/commercialhaskell/stack#readme stack> /installed, you can run this example like a shell script:/
   .
   @
     #!\/usr\/bin\/env stack
@@ -11,17 +12,17 @@ description:
     &#123;-&#35; LANGUAGE OverloadedStrings &#35;-&#125;
     import Data.Monoid ((&#60;&#62;))
     import Data.Text (Text)
-    import Network.Wai (Request, defaultRequest, Response)
+    import Network.Wai (Response)
     import Network.Wai.Handler.Warp (run)
     import Web.Fn
     .
-    data Ctxt = Ctxt &#123; _req :: Request &#125;
+    data Ctxt = Ctxt &#123; _req :: FnRequest &#125;
     instance RequestContext Ctxt where
     &#32; getRequest = _req
     &#32; setRequest c r = c &#123; _req = r &#125;
     .
     initializer :: IO Ctxt
-    initializer = return (Ctxt defaultRequest)
+    initializer = return (Ctxt defaultFnRequest)
     .
     main :: IO ()
     main = do ctxt <- initializer
@@ -41,8 +42,6 @@ description:
     echoH _ msg = okText $ &#34;Echoing '&#34; &#60;&#62; msg &#60;&#62; &#34;'.&#34;
 
   @
-  .
-  /provided you have/ <https://github.com/commercialhaskell/stack#readme stack> /installed, you can run this example like a shell script./
   .
   .
   Fn lets you write web code that just looks like normal Haskell code.
@@ -68,7 +67,7 @@ description:
   where all necessary data is passed via function arguments, and control
   flow is mediated by return values.
 
-homepage:            http://github.com/dbp/fn#readme
+homepage:            http://github.cxom/dbp/fn#readme
 license:             ISC
 license-file:        LICENSE
 author:              Daniel Patterson <dbp@dbpmail.net>
@@ -84,7 +83,8 @@ library
   hs-source-dirs:      src
   exposed-modules:     Web.Fn
   build-depends:       base >= 4.7 && < 5
-                     , wai
+                     , wai >= 3
+                     , wai-extra >= 3
                      , http-types
                      , text
                      , blaze-builder
@@ -105,6 +105,7 @@ test-suite fn-test
                      , text
                      , http-types
                      , wai
+                     , wai-extra
                      , unordered-containers
                      , filepath
                      , directory

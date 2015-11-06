@@ -99,7 +99,7 @@ heistServe :: (RequestContext ctxt, HeistContext ctxt) =>
               ctxt ->
               IO (Maybe Response)
 heistServe ctxt =
-  let p = pathInfo $ getRequest ctxt in
+  let p = pathInfo . fst $ getRequest ctxt in
   render ctxt (T.intercalate "/" p)
 
 -- | Render a single template by name.

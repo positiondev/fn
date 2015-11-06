@@ -18,11 +18,13 @@ request, etc).
 specify many parameters (most commonly, numeric ids, but can be many
 things), so the handlers should be functions that take those as
 parameters.
-
 -}
 
+
 module Web.Fn ( -- * Application setup
-                RequestContext(..)
+                FnRequest
+              , defaultFnRequest
+              , RequestContext(..)
               , toWAI
                 -- * Routing
               , Req
@@ -41,6 +43,9 @@ module Web.Fn ( -- * Application setup
               , param
               , paramMany
               , paramOpt
+              , File(..)
+              , file
+              , files
                 -- * Responses
               , staticServe
               , okText
@@ -53,7 +58,9 @@ module Web.Fn ( -- * Application setup
   ) where
 
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
+import           Control.Arrow                      (second)
 import           Data.ByteString                    (ByteString)
+import qualified Data.ByteString.Lazy               as LB
 import           Data.Either                        (rights)
 import qualified Data.HashMap.Strict                as HM
 import           Data.Maybe                         (fromJust)
@@ -63,6 +70,10 @@ import qualified Data.Text.Encoding                 as T
 import           Data.Text.Read                     (decimal, double)
 import           Network.HTTP.Types
 import           Network.Wai
+import           Network.Wai.Parse                  (FileInfo (..), Param,
+                                                     lbsBackEnd,
+                                                     parseRequestBody)
+import qualified Network.Wai.Parse                  as Parse
 import           System.Directory                   (doesFileExist)
 import           System.FilePath                    (takeExtension)
 
@@ -70,7 +81,17 @@ data Store b a = Store b (b -> a)
 instance Functor (Store b) where
   fmap f (Store b h) = Store b (f . h)
 
--- | Specify the way that Fn can get the Request out of your context.
+
+-- | A normal WAI 'Request' and the parsed post body (if present). We can
+-- only parse the body once, so we need to have our request (which we
+-- pass around) to be able to have the parsed body.
+type FnRequest = (Request, ([Param], [Parse.File LB.ByteString]))
+
+-- | A default request, which is a WAI defaultRequest and no post info
+defaultFnRequest :: FnRequest
+defaultFnRequest = (defaultRequest, ([],[]))
+
+-- | Specify the way that Fn can get the 'FnRequest' out of your context.
 --
 -- The easiest way to instantiate this is to use the lens, but if you
 -- don't want to use lenses, define 'getRequest' and 'setRequest'.
@@ -78,27 +99,29 @@ instance Functor (Store b) where
 -- Note that 'requestLens' is defined in terms of 'getRequest' and
 -- 'setRequest' and vice-versa, so you need to define _one_ of these.
 class RequestContext ctxt where
-  requestLens :: Functor f => (Request -> f Request) -> ctxt -> f ctxt
+  requestLens :: Functor f => (FnRequest -> f FnRequest) -> ctxt -> f ctxt
   requestLens f c = setRequest c <$> f (getRequest c)
-  getRequest :: ctxt -> Request
+  getRequest :: ctxt -> FnRequest
   getRequest c =
     let (Store r _) = requestLens (`Store` id) c
     in r
-  setRequest :: ctxt -> Request -> ctxt
+  setRequest :: ctxt -> FnRequest -> ctxt
   setRequest c r =
     let (Store _ b) = requestLens (`Store` id) c
     in b r
 
-instance RequestContext Request where
+instance RequestContext FnRequest where
   getRequest = id
   setRequest _ = id
 
 -- | Convert an Fn application (provide a context, a context to response
--- function and we'll create a WAI application by updating the Request
+-- function and we'll create a WAI application by updating the 'FnRequest'
 -- value for each call).
 toWAI :: RequestContext ctxt => ctxt -> (ctxt -> IO Response) -> Application
-toWAI ctxt f req cont = let ctxt' = setRequest ctxt req
-                        in f ctxt' >>= cont
+toWAI ctxt f req cont =
+  do post <- parseRequestBody lbsBackEnd req
+     let ctxt' = setRequest ctxt (req, post)
+     f ctxt' >>= cont
 
 -- | The main construct for Fn, 'route' takes a context (which it will pass
 -- to all handlers) and a list of potential matches (which, once they
@@ -107,31 +130,37 @@ toWAI ctxt f req cont = let ctxt' = setRequest ctxt req
 --
 -- @
 --  app c = route c [ end ==> index
---                  , path "foo" // path "bar" // segment /? param "id ==> h]
---    where index :: IO (Maybe Response)
---          index = okText "This is the index."
---          h :: Text -> Text -> IO (Maybe Response)
---          h s i = okText ("got path /foo/" <> s <> ", with id=" <> i)
+--                  , path "foo" \/\/ path "bar" \/\/ segment \/? param "id ==> h]
+--    where index :: Ctxt -> IO (Maybe Response)
+--          index _ = okText "This is the index."
+--          h :: Ctxt -> Text -> Text -> IO (Maybe Response)
+--          h _ s i = okText ("got path \/foo\/" <> s <> ", with id=" <> i)
 -- @
 route :: RequestContext ctxt =>
          ctxt ->
-         [ctxt -> Maybe (IO (Maybe Response))] ->
+         [ctxt -> Req -> Maybe (IO (Maybe Response))] ->
          IO (Maybe Response)
-route _ [] = return Nothing
-route ctxt (x:xs) =
-  case x ctxt of
-    Nothing -> route ctxt xs
-    Just action ->
-      do resp <- action
-         case resp of
-           Nothing -> route ctxt xs
-           Just response -> return (Just response)
+route ctxt pths =
+  do let (r,post) = getRequest ctxt
+         m = either (const GET) id (parseMethod (requestMethod r))
+         req = (pathInfo r, queryString r, m, post)
+     route' req pths
+  where route' _ [] = return Nothing
+        route' req (x:xs) =
+          case x ctxt req of
+            Nothing -> route' req xs
+            Just action ->
+              do resp <- action
+                 case resp of
+                   Nothing -> route' req xs
+                   Just response -> return (Just response)
 
 -- | The 'route' function (and all your handlers) return
 -- 'IO (Maybe Response)', because each can elect to not respond (in
 -- which case we will continue to match on routes). But to construct
 -- an application, we need a response in the case that nothing matched
--- - this is what 'fallthrough' does.
+-- - this is what 'fallthrough' allows you to specify. In particular,
+-- 'notFoundText' and 'notFoundHtml' may be useful.
 fallthrough :: IO (Maybe Response) -> IO Response -> IO Response
 fallthrough a ft =
   do response <- a
@@ -205,11 +234,11 @@ mimeMap =  HM.fromList [
 -- | Serves static files out of the specified path according to the
 -- request path. Note that if you have matched parts of the path,
 -- those will not be included in the path used to find the static
--- file. For example, if you have a file @static/img/a.png@, and do:
+-- file. For example, if you have a file @static\/img\/a.png@, and do:
 --
 -- > path "img" ==> staticServe "static"
 --
--- It will match @img/img/a.png@, not @img/a.png@. If you wanted that,
+-- It will match @img\/img\/a.png@, not @img\/a.png@. If you wanted that,
 -- you could:
 --
 -- > anything ==> staticServe "static"
@@ -217,7 +246,7 @@ mimeMap =  HM.fromList [
 -- If no file is found, this will continue routing.
 staticServe :: RequestContext ctxt => Text -> ctxt -> IO (Maybe Response)
 staticServe d ctxt = do
-  let pth = T.unpack $ T.intercalate "/" $  d : pathInfo (getRequest ctxt)
+  let pth = T.unpack $ T.intercalate "/" $  d : pathInfo (fst . getRequest $ ctxt)
   exists <- doesFileExist pth
   if exists
      then do let ext = takeExtension pth
@@ -231,7 +260,7 @@ staticServe d ctxt = do
      else return Nothing
 
 -- | The parts of the path, when split on /, and the query.
-type Req = ([Text], Query, StdMethod)
+type Req = ([Text], Query, StdMethod, ([Param], [Parse.File LB.ByteString]))
 
 -- | The connective between route patterns and the handler that will
 -- be called if the pattern matches. The type is not particularly
@@ -242,14 +271,14 @@ type Req = ([Text], Query, StdMethod)
          (Req -> Maybe (Req, k -> a)) ->
          (ctxt -> k) ->
          ctxt ->
+         Req ->
          Maybe a
-(match ==> handle) ctxt =
-   let r = getRequest ctxt
-       m = either (const GET) id (parseMethod (requestMethod r))
-       x = (pathInfo r, queryString r, m)
-   in case match x of
-        Nothing -> Nothing
-        Just ((pathInfo',_,_), k) -> Just (k $ handle (setRequest ctxt ((getRequest ctxt) { pathInfo = pathInfo' })))
+(match ==> handle) ctxt req =
+   case match req of
+     Nothing -> Nothing
+     Just ((pathInfo',_,_,_), k) ->
+       let (request, post) = getRequest ctxt in
+       Just (k $ handle (setRequest ctxt (request { pathInfo = pathInfo' }, post)))
 
 -- | Connects two path segments. Note that when normally used, the
 -- type parameter r is 'Req'. It is more general here to facilitate
@@ -264,7 +293,7 @@ type Req = ([Text], Query, StdMethod)
                          Nothing -> Nothing
                          Just (req'', k') -> Just (req'', k' . k)
 
--- | Identical to '(//)', provided simply because it serves as a
+-- | Identical to '//', provided simply because it serves as a
 -- nice visual difference when switching from 'path'/'segment' to
 -- 'param' and friends.
 (/?) :: (r -> Maybe (r, k -> k')) ->
@@ -277,7 +306,7 @@ type Req = ([Text], Query, StdMethod)
 path :: Text -> Req -> Maybe (Req, a -> a)
 path s req =
   case req of
-    (x:xs,q,m) | x == s -> Just ((xs, q, m), id)
+    (y:ys,q,m,x) | y == s -> Just ((ys, q, m, x), id)
     _               -> Nothing
 
 -- | Matches there being no parts of the path left. This is useful when
@@ -285,7 +314,7 @@ path s req =
 end :: Req -> Maybe (Req, a -> a)
 end req =
   case req of
-    ([],_,_) -> Just (req, id)
+    ([],_,_,_) -> Just (req, id)
     _ -> Nothing
 
 -- | Matches anything.
@@ -298,20 +327,20 @@ anything req = Just (req, id)
 segment :: FromParam p => Req ->  Maybe (Req, (p -> a) -> a)
 segment req =
   case req of
-    (x:xs,q,m) -> case fromParam x of
-                    Left _ -> Nothing
-                    Right p -> Just ((xs, q, m), \k -> k p)
+    (y:ys,q,m,x) -> case fromParam y of
+                      Left _ -> Nothing
+                      Right p -> Just ((ys, q, m, x), \k -> k p)
     _     -> Nothing
 
 -- | Matches on a particular HTTP method.
 method :: StdMethod -> Req -> Maybe (Req, a -> a)
-method m r@(_,_,m') | m == m' = Just (r, id)
+method m r@(_,_,m',_) | m == m' = Just (r, id)
 method _ _ = Nothing
 
 data ParamError = ParamMissing | ParamUnparsable | ParamOtherError Text deriving (Eq, Show)
 
--- | A class that is used for parsing for 'param', 'paramOpt', and
--- 'segment'.
+-- | A class that is used for parsing for 'param', 'paramOpt', 'paramMany'
+-- and 'segment'.
 class FromParam a where
   fromParam :: Text -> Either ParamError a
 
@@ -330,29 +359,40 @@ instance FromParam Double where
                             Left ParamUnparsable
                   Right (v, _) -> Right v
 
+
+findParamMatches :: FromParam p => Text -> [(ByteString, Maybe ByteString)] -> [Either ParamError p]
+findParamMatches n ps = map (fromParam . maybe "" T.decodeUtf8 . snd) .
+                        filter ((== T.encodeUtf8 n) . fst) $
+                        ps
+
 -- | Matches on a single query parameter of the given name. If there is no
 -- parameters, or it cannot be parsed into the type needed by the
 -- handler, it won't match.
 param :: FromParam p => Text -> Req -> Maybe (Req, (p -> a) -> a)
 param n req =
-  let (_,q,_) = req
-      match = filter ((== T.encodeUtf8 n) . fst) q
-  in case rights (map (fromParam . maybe "" T.decodeUtf8 . snd) match) of
-       [x] -> Just (req, \k -> k x)
-       _ -> Nothing
+  let (_,q,_,(ps, _)) = req
+  in case rights $ findParamMatches n q of
+       [y] -> Just (req, \k -> k y)
+       []  -> case rights $ findParamMatches n (map (second Just) ps) of
+                [y] -> Just (req, \k -> k y)
+                -- TODO(dbp 2015-11-05): It's too bad that the
+                -- request body parsing will possibly be
+                -- duplicated, in case nothing matches. Perhaps
+                -- both branches should thread...
+                _ -> Nothing
+       _   -> Nothing
 
 -- | Matches on query parameters of the given name. If there are no
--- parameters, or it cannot be parsed into the type needed by the
+-- parameters, or they cannot be parsed into the type needed by the
 -- handler, it won't match.
 paramMany :: FromParam p => Text -> Req -> Maybe (Req, ([p] -> a) -> a)
 paramMany n req =
-  let (_,q,_) = req
-      match = filter ((== T.encodeUtf8 n) . fst) q
-  in case map (maybe "" T.decodeUtf8 . snd) match of
+  let (_,q,_,(ps,_)) = req
+  in case findParamMatches n (q ++ map (second Just) ps) of
        [] -> Nothing
-       xs -> let ps = rights $ map fromParam xs in
-             if length ps == length xs
-                then Just (req, \k -> k ps)
+       xs -> let ys = rights xs in
+             if length ys == length xs
+                then Just (req, \k -> k ys)
                 else Nothing
 
 -- | If the specified parameters are present, they will be parsed into the
@@ -363,14 +403,42 @@ paramOpt :: FromParam p =>
             Req ->
             Maybe (Req, (Either ParamError [p] -> a) -> a)
 paramOpt n req =
-  let (_,q,_) = req
-      match = filter ((== T.encodeUtf8 n) . fst) q
-  in case map (maybe "" T.decodeUtf8 . snd) match of
+  let (_,q,_,(ps, _)) = req
+  in case findParamMatches n (q ++ map (second Just) ps) of
        [] -> Just (req, \k -> k (Left ParamMissing))
-       ps -> Just (req, \k -> k (foldLefts [] (map fromParam ps)))
+       ys -> Just (req, \k -> k (foldLefts [] ys))
   where foldLefts acc [] = Right (reverse acc)
         foldLefts _ (Left x : _) = Left x
         foldLefts acc (Right x : xs) = foldLefts (x : acc) xs
+
+
+-- | An uploaded file.
+data File = File { fileName        :: Text
+                 , fileContentType :: Text
+                 , fileContent     :: LB.ByteString
+                 }
+
+-- | Matches an uploaded file with the given parameter name.
+file :: Text -> Req -> Maybe (Req, (File -> a) -> a)
+file n req =
+  let (_,_,_,(_, fs)) = req
+  in case filter ((== T.encodeUtf8 n) . fst) fs of
+       [(_, FileInfo nm ct c)] -> Just (req, \k -> k (File (T.decodeUtf8 nm)
+                                                           (T.decodeUtf8 ct)
+                                                           c))
+       _ -> Nothing
+
+-- | Matches all uploaded files, passing their parameter names and
+-- contents.
+files :: Req -> Maybe (Req, ([(Text, File)] -> a) -> a)
+files req =
+  let (_,_,_,(_, fs')) = req
+      fs = map (\(n, FileInfo nm ct c) ->
+                  (T.decodeUtf8 n, File (T.decodeUtf8 nm)
+                                        (T.decodeUtf8 ct)
+                                        c))
+               fs'
+  in Just (req, \k -> k fs)
 
 returnText :: Text -> Status -> ByteString -> IO (Maybe Response)
 returnText text status content =

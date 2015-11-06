@@ -12,20 +12,23 @@ import           Web.Fn
 
 newtype R = R ([Text], Query)
 instance RequestContext R where
-  getRequest (R (p',q')) = defaultRequest { pathInfo = p', queryString = q' }
-  setRequest (R _) r = R (pathInfo r, queryString r)
+  getRequest (R (p',q')) = (defaultRequest { pathInfo = p', queryString = q' }, ([],[]))
+  setRequest (R _) (r,_) = R (pathInfo r, queryString r)
+rr :: R
+rr = R ([], [])
 p :: [Text] -> Req
-p x = (x,[],GET)
+p y = (y,[],GET,([],[]))
 _p :: [Text] -> Req ->  Req
-_p x (_,q',m') = (x,q',m')
+_p y (_,q',m',x') = (y,q',m',x')
 q :: Query -> Req
-q x = ([],x,GET)
+q y = ([],y,GET,([],[]))
 _q :: Query -> Req -> Req
-_q x (p',_,m') = (p',x,m')
+_q y (p',_,m',x') = (p',y,m',x')
 m :: StdMethod -> Req
-m x = ([],[],x)
+m y = ([],[],y,([],[]))
 _m :: StdMethod -> Req -> Req
-_m x (p',q',_) = (p',q',x)
+_m y (p',q',_,x') = (p',q',y,x')
+
 
 j :: Show a => Maybe (a,b) -> Expectation
 j mv = fst <$> mv `shouldSatisfy` isJust
@@ -98,20 +101,18 @@ main = hspec $ do
          vn ((path "a" // segment // segment /? param "id")
                (_p ["a", "b"] $ q [("id", Just "x")])) t3u
     it "should apply matchers with ==>" $
-      do (path "a" ==> const ())
-           (R (["a"], []))
+      do (path "a" ==> const ()) rr (p ["a"])
            `shouldSatisfy` isJust
-         (segment ==> \_ (_ :: Text) -> ())
-            (R (["a"], []))
+         (segment ==> \_ (_ :: Text) -> ()) rr (p ["1"])
             `shouldSatisfy` isJust
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
-           (R (["a", "b"], []))
+           rr (p ["a", "b"])
            `shouldSatisfy` fromJust
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
-           (R (["a", "a"], []))
+           rr (p ["a", "a"])
            `shouldSatisfy` isNothing
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
-           (R (["a"], []))
+           rr (p ["a"])
            `shouldSatisfy` isNothing
     it "should always pass a value with paramOpt" $
       do snd (fromJust (paramOpt "id" (q [])))
@@ -132,8 +133,8 @@ main = hspec $ do
          j (anything (p ["f","b"]))
 
     it "should match against method" $
-       do j ((method GET) (m GET))
-          n ((method GET) (m POST))
+       do j (method GET (m GET))
+          n (method GET (m POST))
 
   describe "route" $ do
     it "should match route to parameter" $

@@ -19,6 +19,7 @@ import qualified Data.Vault.Lazy                   as Vault
 import qualified Database.PostgreSQL.Simple        as PG
 import qualified Database.Redis                    as R
 import           Heist
+import           Network.HTTP.Types.Method
 import           Network.Wai
 import           Network.Wai.Session               (Session, withSession)
 import           Network.Wai.Session.ClientSession (clientsessionStore)
@@ -27,7 +28,7 @@ import           Web.ClientSession                 (randomKey)
 import           Web.Fn
 import           Web.Fn.Extra.Heist
 
-data Ctxt = Ctxt { _req   :: Request
+data Ctxt = Ctxt { _req   :: FnRequest
                  , _heist :: FnHeistState Ctxt
                  , _db    :: Pool PG.Connection
                  , _redis :: R.Connection
@@ -49,7 +50,7 @@ exampleSplices = do
 
 currentUrlSplice :: Ctxt -> X.Node -> Int -> Maybe Text -> FnSplice Ctxt
 currentUrlSplice ctxt _ rep pref =
-  let u = T.decodeUtf8 . rawPathInfo $ ctxt ^. req in
+  let u = T.decodeUtf8 . rawPathInfo $ ctxt ^. req . _1 in
   return $
     replicate rep (X.TextNode (fromMaybe "" pref <> u))
 
@@ -73,7 +74,7 @@ initializer =
                           PG.close 1 60 20
      rconn <- R.connect R.defaultConnectInfo
      session <- Vault.newKey
-     return (Ctxt defaultRequest hs pgpool rconn session)
+     return (Ctxt defaultFnRequest hs pgpool rconn session)
 
 app :: IO (Application, IO ())
 app =
@@ -95,11 +96,13 @@ site :: Ctxt -> IO Response
 site ctxt =
   route ctxt [end ==> indexHandler
              ,path "param" /? param "id" ==> paramHandler
+             ,path "param_many" /? paramMany "id" ==> paramManyHandler
              ,path "template" ==> templateHandler
              ,path "db" /? param "number" ==> dbHandler
              ,path "segment" // segment ==> segmentHandler
              ,path "redis" // segment /? paramOpt "set" ==> redisHandler
              ,path "session" ==> sessionHandler
+             ,path "file" ==> fileHandler
              ,anything ==> heistServe
              ,anything ==> staticServe "static"
              ]
@@ -113,6 +116,10 @@ indexHandler _ =
 paramHandler :: Ctxt -> Int  -> IO (Maybe Response)
 paramHandler _ i =
   okText (T.pack (show i))
+
+paramManyHandler :: Ctxt -> [Int] -> IO (Maybe Response)
+paramManyHandler _ is =
+  okText (T.pack (show is))
 
 templateHandler :: Ctxt -> IO (Maybe Response)
 templateHandler ctxt =
@@ -145,10 +152,16 @@ redisHandler ctxt key new =
 sessionHandler :: Ctxt -> IO (Maybe Response)
 sessionHandler ctxt =
   do let Just (getsess, putsess) = Vault.lookup (ctxt ^. sess)
-                                                (vault (ctxt ^. req))
+                                                (vault (ctxt ^. req . _1))
      current <- fromMaybe "0" <$> getsess "visits"
      let cur = case T.decimal current of
                  Left _ -> error "Bad value in session"
                  Right (n,_) -> n
      putsess "visits" (T.pack (show (cur + 1 :: Int)))
      okText (T.pack (show cur))
+
+fileHandler :: Ctxt -> IO (Maybe Response)
+fileHandler ctxt = route ctxt [method GET ==> const (render ctxt "file")
+                              ,method POST /? file "f" ==> fileH]
+  where fileH _ (File name ct _) =
+          okText ("Got file named " <> name <> " of type " <> ct)

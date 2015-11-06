@@ -1,5 +1,10 @@
-* 0.?.?.? Daniel Pattersion <dbp@dbpmail.net> 2015-11-??
+* 0.2.0.0 Daniel Pattersion <dbp@dbpmail.net> 2015-11-5
 
+  - Changed to having our own `FnRequest` type, which is a WAI
+    `Request` and the results of parsing the body for contents, since
+    we need to be able to do that once and thread it through.
+  - Add `file` and `files` matchers, which match against and pass file
+    uploads to handlers.
   - Add `staticServe` to serve static files based on path.
 
 * 0.1.4.0 Daniel Pattersion <dbp@dbpmail.net> 2015-11-4

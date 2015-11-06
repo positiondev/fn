@@ -1,4 +1,4 @@
-* 0.?.?.? Daniel Patterson <dbp@dbpmail.net> 2015-11-??
+* 0.2.0.0 Daniel Patterson <dbp@dbpmail.net> 2015-11-5
 
   - Add `heistServe`, which serves templates according to path.
   - Remove `heistLens` and `setHeist` from `HeistContext` type class,

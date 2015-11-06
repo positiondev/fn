@@ -86,11 +86,11 @@ heistInit templateLocations splices =
 -- | Render templates according to the request path. Note that if you
 -- have matched some parts of the path, those will not be included in
 -- the path used to find the templates. For example, if you have
--- 'foo/bar.tpl' in the directory where you loaded templates from,
+-- @foo\/bar.tpl@ in the directory where you loaded templates from,
 --
 -- > path "foo" ==> heistServe
 --
--- Will match @foo/foo/bar@, but not @foo/bar@. To match that, you could:
+-- Will match @foo\/foo\/bar@, but not @foo\/bar@. To match that, you could:
 --
 -- > anything ==> heistServe
 --

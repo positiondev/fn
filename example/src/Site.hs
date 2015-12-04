@@ -99,7 +99,7 @@ site ctxt =
              ,path "param_many" /? paramMany "id" ==> paramManyHandler
              ,path "template" ==> templateHandler
              ,path "db" /? param "number" ==> dbHandler
-             ,path "segment" // segment ==> segmentHandler
+             ,path "segment" // segment // end ==> segmentHandler
              ,path "redis" // segment /? paramOpt "set" ==> redisHandler
              ,path "session" ==> sessionHandler
              ,path "file" ==> fileHandler

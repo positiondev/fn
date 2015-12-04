@@ -20,6 +20,12 @@ main = do
        describe "GET /segment/foo" $
          it "responds with foo" $
            get "/segment/foo" `shouldRespondWith` "foo"
+       describe "GET /segment/foo/" $
+         it "also responds with foo (trailing slash doesn't matter)" $
+           get "/segment/foo/" `shouldRespondWith` "foo"
+       describe "GET /segment//foo" $
+         it "STILL responds with foo (extra slash doesn't matter)" $
+           get "/segment//foo" `shouldRespondWith` "foo"
        describe "GET /random/path" $
          it "should 404" $
            get "/random/path" `shouldRespondWith` 404

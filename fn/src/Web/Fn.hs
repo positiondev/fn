@@ -143,7 +143,7 @@ route :: RequestContext ctxt =>
 route ctxt pths =
   do let (r,post) = getRequest ctxt
          m = either (const GET) id (parseMethod (requestMethod r))
-         req = (pathInfo r, queryString r, m, post)
+         req = (filter (/= "") (pathInfo r), queryString r, m, post)
      route' req pths
   where route' _ [] = return Nothing
         route' req (x:xs) =

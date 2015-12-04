@@ -1,3 +1,8 @@
+* 0.2.1.0 Daniel Patterson <dbp@dbpmail.net> 2015-12-4
+
+  - Fix bug in url routing where "/foo/bar", "/foo/bar/", and
+    "/foo//bar" were all treated differently.
+
 * 0.2.0.0 Daniel Pattersion <dbp@dbpmail.net> 2015-11-5
 
   - Changed to having our own `FnRequest` type, which is a WAI

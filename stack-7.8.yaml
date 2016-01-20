@@ -1,0 +1,21 @@
+resolver: lts-2.22
+
+packages:
+- 'fn'
+- 'fn-extra'
+- 'example'
+
+extra-deps:
+- wai-util-0.8
+- http-accept-0.2
+- logging-3.0.2
+- wai-session-clientsession-0.1
+- cereal-text-0.1.0.1
+- wai-session-0.3.2
+- hedis-0.6.10
+- bytestring-lexing-0.5.0.2
+- time-locale-compat-0.1.1.1
+
+flags: {}
+
+extra-package-dbs: []

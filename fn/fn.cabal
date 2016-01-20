@@ -1,5 +1,5 @@
 name:                fn
-version:             0.2.0.1
+version:             0.2.0.2
 synopsis:            A functional web framework.
 description:
   A Haskell web framework where you write plain old functions.

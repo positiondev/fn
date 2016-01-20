@@ -1,4 +1,8 @@
-* 0.2.1.0 Daniel Patterson <dbp@dbpmail.net> 2015-12-4
+* 0.2.0.2 Daniel Patterson <dbp@dbpmail.net> 2016-1-20
+
+  - Fixe for GHC 7.8, which cabal file said would work, but didn't.
+
+* 0.2.0.1 Daniel Patterson <dbp@dbpmail.net> 2015-12-4
 
   - Fix bug in url routing where "/foo/bar", "/foo/bar/", and
     "/foo//bar" were all treated differently.

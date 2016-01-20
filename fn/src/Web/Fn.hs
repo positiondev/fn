@@ -58,6 +58,7 @@ module Web.Fn ( -- * Application setup
   ) where
 
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
+import           Control.Applicative                ((<$>))
 import           Control.Arrow                      (second)
 import           Data.ByteString                    (ByteString)
 import qualified Data.ByteString.Lazy               as LB

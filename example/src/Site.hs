@@ -4,6 +4,7 @@
 
 module Site where
 
+import           Control.Applicative               ((<$>))
 import           Control.Lens
 import           Control.Logging
 import           Data.Default                      (def)

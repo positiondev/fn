@@ -11,12 +11,18 @@ dependencies:
     - tar xvzf /tmp/stack.tar.gz -C /tmp
     - sudo mv /tmp/stack-0.1.6.0-linux-x86_64/stack /usr/bin/stack
   override:
-    - stack setup
-    - stack build --pedantic --jobs=4
-    - stack test fn --no-run-tests --pedantic
-    - stack test fn-example --no-run-tests --pedantic
+    - stack setup --resolver lts-2.22
+    - stack setup --resolver lts-3.22
+    - stack build --jobs=4 --resolver lts-2.22
+    - stack test fn --no-run-tests --resolver lts-2.22
+    - stack test fn-example --no-run-tests --resolver lts-2.22
+    - stack build --jobs=4 --resolver lts-3.22
+    - stack test fn --no-run-tests --resolver lts-3.22
+    - stack test fn-example --no-run-tests --resolver lts-3.22
 
 test:
   override:
-    - stack test fn --pedantic
-    - stack test fn-example --pedantic
+    - stack test fn --resolver lts-2.22
+    - stack test fn-example --resolver lts-2.22
+    - stack test fn --resolver lts-3.22
+    - stack test fn-example --resolver lts-3.22

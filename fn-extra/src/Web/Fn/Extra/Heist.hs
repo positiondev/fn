@@ -36,6 +36,7 @@ module Web.Fn.Extra.Heist ( -- * Types
                           ) where
 
 import           Blaze.ByteString.Builder
+import           Control.Applicative        ((<$>))
 import           Control.Arrow              (first)
 import           Control.Lens
 import           Control.Monad.Reader

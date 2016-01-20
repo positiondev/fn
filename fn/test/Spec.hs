@@ -2,9 +2,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+import           Control.Applicative ((<$>))
 import           Data.Either
 import           Data.Maybe
-import           Data.Text          (Text)
+import           Data.Text           (Text)
 import           Network.HTTP.Types
 import           Network.Wai
 import           Test.Hspec

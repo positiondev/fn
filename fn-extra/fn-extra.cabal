@@ -1,5 +1,5 @@
 name:                fn-extra
-version:             0.2.0.0
+version:             0.2.0.1
 synopsis:            Extras for Fn, a functional web framework.
 description:         Please see README.
 homepage:            http://github.com/dbp/fn#readme

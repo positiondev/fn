@@ -97,7 +97,13 @@ type PostMVar = Maybe (MVar (Maybe ([Param], [Parse.File LB.ByteString])))
 -- pass around) to be able to have the parsed body.
 type FnRequest = (Request, PostMVar)
 
--- | A default request, which is a WAI defaultRequest and no post info
+-- | A default request, which is a WAI defaultRequest and a place for
+-- an MVar where post info will be placed (if you parse the post
+-- body).
+--
+-- Warning: If you try to parse the post body (with '!=>') without
+-- replacing the Nothing placeholder with an actual MVar, it will blow
+-- up!
 defaultFnRequest :: FnRequest
 defaultFnRequest = (defaultRequest, Nothing)
 

@@ -418,18 +418,28 @@ findParamMatches n ps = fromParam .
                         filter ((== T.encodeUtf8 n) . fst) $
                         ps
 
+getMVarParams mv = case mv of
+                     Just mv' -> do v <- readMVar mv'
+                                    return $ case v of
+                                               Nothing -> []
+                                               Just (ps',_) -> ps'
+                     Nothing -> return []
+
 -- | Matches on a query parameter of the given name. It is parsed into
 -- the type needed by the handler, which can be a 'Maybe' type if the
 -- parameter is optional, or a list type if there can be many. If the
--- paramters cannot be parsed into the type needed by the handler, it
+-- parameters cannot be parsed into the type needed by the handler, it
 -- won't match.
+--
+-- Note: If you have used the '!=>' connective, so that the request
+-- body has been parsed, this will also match post parameters (and
+-- will combine the two together). If you haven't used that connective
+-- (so the pattern is matched to handler with '==>'), it will only
+-- match query parameters.
 param :: FromParam p => Text -> Req -> IO (Maybe (Req, (p -> a) -> a))
 param n req =
-  do let (_,q,_,Just mv) = req
-     v <- readMVar mv
-     let ps = case v of
-                Nothing -> []
-                Just (ps',_) -> ps'
+  do let (_,q,_,mv) = req
+     ps <- getMVarParams mv
      return $ case findParamMatches n q of
                 Right y -> Just (req, \k -> k y)
                 Left _  -> case findParamMatches n (map (second Just) ps) of
@@ -442,11 +452,8 @@ param n req =
 -- handler, it won't match.
 paramMany :: FromParam p => Text -> Req -> IO (Maybe (Req, ([p] -> a) -> a))
 paramMany n req =
-  do let (_,q,_,Just mv) = req
-     v <- readMVar mv
-     let ps = case v of
-                Nothing -> []
-                Just (ps',_) -> ps'
+  do let (_,q,_,mv) = req
+     ps <- getMVarParams mv
      return $ case findParamMatches n (q ++ map (second Just) ps) of
                 Left _ -> Nothing
                 Right ys -> Just (req, \k -> k ys)
@@ -454,16 +461,19 @@ paramMany n req =
 -- | If the specified parameters are present, they will be parsed into the
 -- type needed by the handler, but if they aren't present or cannot be
 -- parsed, the handler will still be called.
+--
+-- Note: If you have used the '!=>' connective, so that the request
+-- body has been parsed, this will also match post parameters (and
+-- will combine the two together). If you haven't used that connective
+-- (so the pattern is matched to handler with '==>'), it will only
+-- match query parameters.
 paramOpt :: FromParam p =>
             Text ->
             Req ->
             IO (Maybe (Req, (Either ParamError p -> a) -> a))
 paramOpt n req =
-  do let (_,q,_,Just mv) = req
-     v <- readMVar mv
-     let ps = case v of
-                Nothing -> []
-                Just (ps',_) -> ps'
+  do let (_,q,_,mv) = req
+     ps <- getMVarParams mv
      return $ Just (req, \k -> k (findParamMatches n (q ++ map (second Just) ps)))
 
 
@@ -473,14 +483,23 @@ data File = File { fileName        :: Text
                  , fileContent     :: LB.ByteString
                  }
 
+getMVarFiles mv = case mv of
+                    Nothing -> error $ "Fn: tried to read a 'file' or 'files', but FnRequest wasn't initialized with MVar."
+                    Just mv' -> do
+                      v <- readMVar mv'
+                      case v of
+                        Nothing -> error $ "Fn: tried to read a 'file' or 'files' from the request without parsing the body with '!=>'"
+                        Just (_,fs') -> return fs'
+
 -- | Matches an uploaded file with the given parameter name.
+--
+-- Note: You must use the '!=>' connective between the pattern and the
+-- handler, or else the request body will not have been parsed and
+-- this will fail.
 file :: Text -> Req -> IO (Maybe (Req, (File -> a) -> a))
 file n req =
-  do let (_,_,_,Just mv) = req
-     v <- readMVar mv
-     let fs = case v of
-                Nothing -> error $ "Fn: tried to read a 'file' from the request without parsing the body with '!=>'"
-                Just (_,fs') -> fs'
+  do let (_,_,_,mv) = req
+     fs <- getMVarFiles mv
      return $ case filter ((== T.encodeUtf8 n) . fst) fs of
                 [(_, FileInfo nm ct c)] -> Just (req, \k -> k (File (T.decodeUtf8 nm)
                                                                     (T.decodeUtf8 ct)
@@ -489,6 +508,10 @@ file n req =
 
 -- | Matches all uploaded files, passing their parameter names and
 -- contents.
+--
+-- Note: You must use the '!=>' connective between the pattern and the
+-- handler, or else the request body will not have been parsed and
+-- this will fail.
 files :: Req -> IO (Maybe (Req, ([(Text, File)] -> a) -> a))
 files req =
   do let (_,_,_,Just mv) = req

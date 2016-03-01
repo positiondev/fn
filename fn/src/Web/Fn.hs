@@ -49,6 +49,7 @@ module Web.Fn ( -- * Application setup
               , files
                 -- * Responses
               , staticServe
+              , sendFile
               , okText
               , okHtml
               , errText
@@ -56,6 +57,7 @@ module Web.Fn ( -- * Application setup
               , notFoundText
               , notFoundHtml
               , redirect
+              , redirectReferer
   ) where
 
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
@@ -64,7 +66,7 @@ import           Control.Arrow                      (second)
 import           Control.Concurrent.MVar
 import           Data.ByteString                    (ByteString)
 import qualified Data.ByteString.Lazy               as LB
-import           Data.Either                        (rights)
+import           Data.Either                        (lefts, rights)
 import qualified Data.HashMap.Strict                as HM
 import           Data.Maybe                         (fromJust)
 import           Data.Text                          (Text)
@@ -252,17 +254,25 @@ mimeMap =  HM.fromList [
 staticServe :: RequestContext ctxt => Text -> ctxt -> IO (Maybe Response)
 staticServe d ctxt = do
   let pth = T.unpack $ T.intercalate "/" $  d : pathInfo (fst . getRequest $ ctxt)
-  exists <- doesFileExist pth
-  if exists
-     then do let ext = takeExtension pth
-                 contentType = case HM.lookup ext mimeMap of
-                                 Nothing -> []
-                                 Just t -> [(hContentType, t)]
-             return $ Just $ responseFile status200
-                                          contentType
-                                          pth
-                                          Nothing
-     else return Nothing
+  sendFile pth
+
+-- | Sends a specific file specified by path. It will specify the
+-- content-type if it can figure it out by the file extension.
+--
+-- If no file exists at the given path, it will keep routing.
+sendFile :: FilePath -> IO (Maybe Response)
+sendFile pth =
+  do exists <- doesFileExist pth
+     if exists
+        then do let ext = takeExtension pth
+                    contentType = case HM.lookup ext mimeMap of
+                                    Nothing -> []
+                                    Just t -> [(hContentType, t)]
+                return $ Just $ responseFile status200
+                                             contentType
+                                             pth
+                                             Nothing
+        else return Nothing
 
 -- | The parts of the path, when split on /, and the query.
 type Req = ([Text], Query, StdMethod, PostMVar)
@@ -355,7 +365,7 @@ anything req = return $ Just (req, id)
 segment :: FromParam p => Req -> IO (Maybe (Req, (p -> a) -> a))
 segment req =
   return $ case req of
-             (y:ys,q,m,x) -> case fromParam y of
+             (y:ys,q,m,x) -> case fromParam [y] of
                                Left _ -> Nothing
                                Right p -> Just ((ys, q, m, x), \k -> k p)
              _     -> Nothing
@@ -365,37 +375,54 @@ method :: StdMethod -> Req -> IO (Maybe (Req, a -> a))
 method m r@(_,_,m',_) | m == m' = return $ Just (r, id)
 method _ _ = return Nothing
 
-data ParamError = ParamMissing | ParamUnparsable | ParamOtherError Text deriving (Eq, Show)
+data ParamError = ParamMissing | ParamTooMany | ParamUnparsable | ParamOtherError Text deriving (Eq, Show)
 
--- | A class that is used for parsing for 'param', 'paramOpt', 'paramMany'
+-- | A class that is used for parsing for 'param' and 'paramOpt'.
 -- and 'segment'.
 class FromParam a where
-  fromParam :: Text -> Either ParamError a
+  fromParam :: [Text] -> Either ParamError a
 
 instance FromParam Text where
-  fromParam = Right
+  fromParam [x] = Right x
+  fromParam [] = Left ParamMissing
+  fromParam _ = Left ParamTooMany
 instance FromParam Int where
-  fromParam t = case decimal t of
-                  Left _ -> Left ParamUnparsable
-                  Right m | snd m /= "" ->
-                            Left ParamUnparsable
-                  Right (v, _) -> Right v
+  fromParam [t] = case decimal t of
+                    Left _ -> Left ParamUnparsable
+                    Right m | snd m /= "" ->
+                              Left ParamUnparsable
+                    Right (v, _) -> Right v
+  fromParam [] = Left ParamMissing
+  fromParam _ = Left ParamTooMany
 instance FromParam Double where
-  fromParam t = case double t of
-                  Left _ -> Left ParamUnparsable
-                  Right m | snd m /= "" ->
-                            Left ParamUnparsable
-                  Right (v, _) -> Right v
+  fromParam [t] = case double t of
+                    Left _ -> Left ParamUnparsable
+                    Right m | snd m /= "" ->
+                              Left ParamUnparsable
+                    Right (v, _) -> Right v
+  fromParam [] = Left ParamMissing
+  fromParam _ = Left ParamTooMany
+instance FromParam a => FromParam [a] where
+  fromParam ps = let res = map (fromParam . (:[])) ps in
+                 case lefts res of
+                   [] -> Right $ rights res
+                   _ -> Left $ ParamOtherError "Couldn't parse all parameters."
+instance FromParam a => FromParam (Maybe a) where
+  fromParam [x] = Just <$> fromParam [x]
+  fromParam [] = Right Nothing
+  fromParam _ = Left ParamTooMany
 
-
-findParamMatches :: FromParam p => Text -> [(ByteString, Maybe ByteString)] -> [Either ParamError p]
-findParamMatches n ps = map (fromParam . maybe "" T.decodeUtf8 . snd) .
+findParamMatches :: FromParam p => Text -> [(ByteString, Maybe ByteString)] -> Either ParamError p
+findParamMatches n ps = fromParam .
+                        map (maybe "" T.decodeUtf8 . snd) .
                         filter ((== T.encodeUtf8 n) . fst) $
                         ps
 
--- | Matches on a single query parameter of the given name. If there is no
--- parameters, or it cannot be parsed into the type needed by the
--- handler, it won't match.
+-- | Matches on a query parameter of the given name. It is parsed into
+-- the type needed by the handler, which can be a 'Maybe' type if the
+-- parameter is optional, or a list type if there can be many. If the
+-- paramters cannot be parsed into the type needed by the handler, it
+-- won't match.
 param :: FromParam p => Text -> Req -> IO (Maybe (Req, (p -> a) -> a))
 param n req =
   do let (_,q,_,Just mv) = req
@@ -403,17 +430,13 @@ param n req =
      let ps = case v of
                 Nothing -> []
                 Just (ps',_) -> ps'
-     return $ case rights $ findParamMatches n q of
-                [y] -> Just (req, \k -> k y)
-                []  -> case rights $ findParamMatches n (map (second Just) ps) of
-                         [y] -> Just (req, \k -> k y)
-                         -- TODO(dbp 2015-11-05): It's too bad that the
-                         -- request body parsing will possibly be
-                         -- duplicated, in case nothing matches. Perhaps
-                         -- both branches should thread...
-                         _ -> Nothing
-                _   -> Nothing
+     return $ case findParamMatches n q of
+                Right y -> Just (req, \k -> k y)
+                Left _  -> case findParamMatches n (map (second Just) ps) of
+                             Right y -> Just (req, \k -> k y)
+                             Left _ -> Nothing
 
+{-# DEPRECATED paramMany "Use 'param' with a list type, or define param parsing for non-empty list." #-}
 -- | Matches on query parameters of the given name. If there are no
 -- parameters, or they cannot be parsed into the type needed by the
 -- handler, it won't match.
@@ -425,11 +448,8 @@ paramMany n req =
                 Nothing -> []
                 Just (ps',_) -> ps'
      return $ case findParamMatches n (q ++ map (second Just) ps) of
-                [] -> Nothing
-                xs -> let ys = rights xs in
-                      if length ys == length xs
-                         then Just (req, \k -> k ys)
-                         else Nothing
+                Left _ -> Nothing
+                Right ys -> Just (req, \k -> k ys)
 
 -- | If the specified parameters are present, they will be parsed into the
 -- type needed by the handler, but if they aren't present or cannot be
@@ -437,19 +457,14 @@ paramMany n req =
 paramOpt :: FromParam p =>
             Text ->
             Req ->
-            IO (Maybe (Req, (Either ParamError [p] -> a) -> a))
+            IO (Maybe (Req, (Either ParamError p -> a) -> a))
 paramOpt n req =
   do let (_,q,_,Just mv) = req
      v <- readMVar mv
      let ps = case v of
                 Nothing -> []
                 Just (ps',_) -> ps'
-     return $ case findParamMatches n (q ++ map (second Just) ps) of
-                [] -> Just (req, \k -> k (Left ParamMissing))
-                ys -> Just (req, \k -> k (foldLefts [] ys))
-  where foldLefts acc [] = Right (reverse acc)
-        foldLefts _ (Left x : _) = Left x
-        foldLefts acc (Right x : xs) = foldLefts (x : acc) xs
+     return $ Just (req, \k -> k (findParamMatches n (q ++ map (second Just) ps)))
 
 
 -- | An uploaded file.
@@ -505,6 +520,7 @@ html = "text/html; charset=utf-8"
 okText :: Text -> IO (Maybe Response)
 okText t = returnText t status200 plainText
 
+
 -- | Returns Html (in 'Text') as a response.
 okHtml :: Text -> IO (Maybe Response)
 okHtml t = returnText t status200 html
@@ -537,3 +553,11 @@ redirect target =
     responseBuilder status303
                     [(hLocation, T.encodeUtf8 target)]
                     (B.fromText "")
+
+-- | Redirects to the referrer, if present in headers, else to "/".
+redirectReferer :: RequestContext ctxt => ctxt -> IO (Maybe Response)
+redirectReferer ctxt =
+  let rs = requestHeaders $ fst $ getRequest ctxt in
+  case lookup hReferer rs of
+    Nothing -> redirect "/"
+    Just r -> redirect (T.decodeUtf8 r)

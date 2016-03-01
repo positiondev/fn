@@ -132,11 +132,11 @@ main = hspec $ do
     it "should always pass a value with paramOpt" $
       do x <- paramOpt "id" (q [])
          snd (fromJust x)
-             (isLeft :: Either ParamError [Text] -> Bool)
+             (isLeft :: Either ParamError Text -> Bool)
              `shouldBe` True
          y <- paramOpt "id" (q [("id", Just "foo")])
          snd (fromJust y)
-             (== Right (["foo"] :: [Text]))
+             (== Right ("foo" :: Text))
              `shouldBe` True
     it "should match end against no further path segments" $
       do j (end (p []))
@@ -163,18 +163,18 @@ main = hspec $ do
 
   describe "parameter parsing" $
     do it "should parse Text" $
-         fromParam "hello" `shouldBe` Right ("hello" :: Text)
+         fromParam ["hello"] `shouldBe` Right ("hello" :: Text)
        it "should parse Int" $
-         do fromParam "1" `shouldBe` Right (1 :: Int)
-            fromParam "2011" `shouldBe` Right (2011 :: Int)
-            fromParam "aaa" `shouldSatisfy`
+         do fromParam ["1"] `shouldBe` Right (1 :: Int)
+            fromParam ["2011"] `shouldBe` Right (2011 :: Int)
+            fromParam ["aaa"] `shouldSatisfy`
               (isLeft :: Either ParamError Int -> Bool)
-            fromParam "10a" `shouldSatisfy`
+            fromParam ["10a"] `shouldSatisfy`
               (isLeft :: Either ParamError Int -> Bool)
        it "should be able to parse Double" $
-         do fromParam "1" `shouldBe` Right (1 :: Double)
-            fromParam "1.02" `shouldBe` Right (1.02 :: Double)
-            fromParam "thr" `shouldSatisfy`
+         do fromParam ["1"] `shouldBe` Right (1 :: Double)
+            fromParam ["1.02"] `shouldBe` Right (1.02 :: Double)
+            fromParam ["thr"] `shouldSatisfy`
               (isLeft :: Either ParamError Double -> Bool)
-            fromParam "100o" `shouldSatisfy`
+            fromParam ["100o"] `shouldSatisfy`
               (isLeft :: Either ParamError Double -> Bool)

@@ -96,12 +96,12 @@ app =
 site :: Ctxt -> IO Response
 site ctxt =
   route ctxt [end ==> indexHandler
-             ,path "param" /? param "id" ==> paramHandler
-             ,path "param_many" /? paramMany "id" ==> paramManyHandler
+             ,path "param" // param "id" !=> paramHandler
+             ,path "param_many" // paramMany "id" !=> paramManyHandler
              ,path "template" ==> templateHandler
-             ,path "db" /? param "number" ==> dbHandler
+             ,path "db" // param "number" ==> dbHandler
              ,path "segment" // segment // end ==> segmentHandler
-             ,path "redis" // segment /? paramOpt "set" ==> redisHandler
+             ,path "redis" // segment // paramOpt "set" ==> redisHandler
              ,path "session" ==> sessionHandler
              ,path "file" ==> fileHandler
              ,anything ==> heistServe
@@ -112,7 +112,7 @@ site ctxt =
 indexHandler :: Ctxt -> IO (Maybe Response)
 indexHandler _ =
   okText ("Try /param?id=123, /template, /db?number=123, /segment/foo,"
-       <> " /redis/key, /redis/key?set=new, /session, or /haskell.png")
+       <> " /redis/key, /redis/key?set=new, /session, or /file, /haskell.png")
 
 paramHandler :: Ctxt -> Int  -> IO (Maybe Response)
 paramHandler _ i =
@@ -162,7 +162,7 @@ sessionHandler ctxt =
      okText (T.pack (show cur))
 
 fileHandler :: Ctxt -> IO (Maybe Response)
-fileHandler ctxt = route ctxt [method GET ==> const (render ctxt "file")
-                              ,method POST /? file "f" ==> fileH]
+fileHandler ctxt = route ctxt [method GET              ==> const (render ctxt "file")
+                              ,method POST // file "f" !=> fileH]
   where fileH _ (File name ct _) =
           okText ("Got file named " <> name <> " of type " <> ct)

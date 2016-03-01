@@ -449,11 +449,9 @@ param :: FromParam p => Text -> Req -> IO (Maybe (Req, (p -> a) -> a))
 param n req =
   do let (_,q,_,mv) = req
      ps <- getMVarParams mv
-     return $ case findParamMatches n q of
+     return $ case findParamMatches n (q ++ map (second Just) ps) of
                 Right y -> Just (req, \k -> k y)
-                Left _  -> case findParamMatches n (map (second Just) ps) of
-                             Right y -> Just (req, \k -> k y)
-                             Left _ -> Nothing
+                Left _  -> Nothing
 
 {-# DEPRECATED paramMany "Use 'param' with a list type, or define param parsing for non-empty list." #-}
 -- | Matches on query parameters of the given name. If there are no

@@ -33,6 +33,7 @@ module Web.Fn ( -- * Application setup
               , (==>)
               , (!=>)
               , (//)
+              , (/?)
               , path
               , end
               , anything
@@ -321,6 +322,12 @@ type Req = ([Text], Query, StdMethod, PostMVar)
                     Nothing -> Nothing
                     Just (req'', k') -> Just (req'', k' . k)
 
+{-# DEPRECATED (/?) "Use the identical '//' instead." #-}
+-- | A synonym for '//'. To be removed
+(/?) :: (r -> IO (Maybe (r, k -> k'))) ->
+        (r -> IO (Maybe (r, k' -> a))) ->
+        r -> IO (Maybe (r, k -> a))
+(/?) = (//)
 
 -- | Matches a literal part of the path. If there is no path part
 -- left, or the next part does not match, the whole match fails.
@@ -392,7 +399,7 @@ findParamMatches n ps = map (fromParam . maybe "" T.decodeUtf8 . snd) .
 param :: FromParam p => Text -> Req -> IO (Maybe (Req, (p -> a) -> a))
 param n req =
   do let (_,q,_,Just mv) = req
-     v <- takeMVar mv
+     v <- readMVar mv
      let ps = case v of
                 Nothing -> []
                 Just (ps',_) -> ps'
@@ -413,7 +420,7 @@ param n req =
 paramMany :: FromParam p => Text -> Req -> IO (Maybe (Req, ([p] -> a) -> a))
 paramMany n req =
   do let (_,q,_,Just mv) = req
-     v <- takeMVar mv
+     v <- readMVar mv
      let ps = case v of
                 Nothing -> []
                 Just (ps',_) -> ps'
@@ -433,7 +440,7 @@ paramOpt :: FromParam p =>
             IO (Maybe (Req, (Either ParamError [p] -> a) -> a))
 paramOpt n req =
   do let (_,q,_,Just mv) = req
-     v <- takeMVar mv
+     v <- readMVar mv
      let ps = case v of
                 Nothing -> []
                 Just (ps',_) -> ps'
@@ -455,7 +462,7 @@ data File = File { fileName        :: Text
 file :: Text -> Req -> IO (Maybe (Req, (File -> a) -> a))
 file n req =
   do let (_,_,_,Just mv) = req
-     v <- takeMVar mv
+     v <- readMVar mv
      let fs = case v of
                 Nothing -> error $ "Fn: tried to read a 'file' from the request without parsing the body with '!=>'"
                 Just (_,fs') -> fs'
@@ -470,7 +477,7 @@ file n req =
 files :: Req -> IO (Maybe (Req, ([(Text, File)] -> a) -> a))
 files req =
   do let (_,_,_,Just mv) = req
-     v <- takeMVar mv
+     v <- readMVar mv
      let fs' = case v of
                  Nothing -> error $ "Fn: tried to read a 'file' from the request without parsing the body with '!=>'"
                  Just (_,fs) -> fs

@@ -96,8 +96,8 @@ app =
 site :: Ctxt -> IO Response
 site ctxt =
   route ctxt [end ==> indexHandler
-             ,path "param" // param "id" ==> paramHandler
-             ,path "param_many" // paramMany "id" ==> paramManyHandler
+             ,path "param" // param "id" !=> paramHandler
+             ,path "param_many" // paramMany "id" !=> paramManyHandler
              ,path "template" ==> templateHandler
              ,path "db" // param "number" ==> dbHandler
              ,path "segment" // segment // end ==> segmentHandler
@@ -162,7 +162,7 @@ sessionHandler ctxt =
      okText (T.pack (show cur))
 
 fileHandler :: Ctxt -> IO (Maybe Response)
-fileHandler ctxt = route ctxt [method GET ==> const (render ctxt "file")
+fileHandler ctxt = route ctxt [method GET              ==> const (render ctxt "file")
                               ,method POST // file "f" !=> fileH]
   where fileH _ (File name ct _) =
           okText ("Got file named " <> name <> " of type " <> ct)

@@ -2,46 +2,60 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import           Control.Applicative ((<$>))
+import           Control.Applicative     ((<$>))
+import           Control.Concurrent.MVar
 import           Data.Either
 import           Data.Maybe
-import           Data.Text           (Text)
+import           Data.Text               (Text)
 import           Network.HTTP.Types
 import           Network.Wai
+import           System.IO.Unsafe
 import           Test.Hspec
 import           Web.Fn
 
+emv = unsafePerformIO (newMVar Nothing)
+
+instance Show (MVar a) where
+  show _ = "<MVar>"
+
 newtype R = R ([Text], Query)
 instance RequestContext R where
-  getRequest (R (p',q')) = (defaultRequest { pathInfo = p', queryString = q' }, ([],[]))
+  getRequest (R (p',q')) = (defaultRequest { pathInfo = p', queryString = q' }, Just emv)
   setRequest (R _) (r,_) = R (pathInfo r, queryString r)
+
 rr :: R
 rr = R ([], [])
 p :: [Text] -> Req
-p y = (y,[],GET,([],[]))
+p y = (y,[],GET,Just emv)
 _p :: [Text] -> Req ->  Req
 _p y (_,q',m',x') = (y,q',m',x')
 q :: Query -> Req
-q y = ([],y,GET,([],[]))
+q y = ([],y,GET,Just emv)
 _q :: Query -> Req -> Req
 _q y (p',_,m',x') = (p',y,m',x')
 m :: StdMethod -> Req
-m y = ([],[],y,([],[]))
+m y = ([],[],y,Just emv)
 _m :: StdMethod -> Req -> Req
 _m y (p',q',_,x') = (p',q',y,x')
 
 
-j :: Show a => Maybe (a,b) -> Expectation
-j mv = fst <$> mv `shouldSatisfy` isJust
-n :: Show a => Maybe (a,b) -> Expectation
-n mv = fst <$> mv `shouldSatisfy` isNothing
+j :: Show a => IO (Maybe (a,b)) -> Expectation
+j mv = do x <- mv
+          fst <$> x `shouldSatisfy` isJust
+n :: Show a => IO (Maybe (a,b)) -> Expectation
+n mv = do x <- mv
+          fst <$> x `shouldSatisfy` isNothing
+v :: IO (Maybe (a, t -> Bool)) -> t -> Expectation
+v mv f = do x <- mv
+            snd (fromJust x) f `shouldBe` True
+vn :: IO (Maybe (a, t -> Bool)) -> t -> Expectation
+vn mv f = do v <- mv
+             case v of
+               Nothing -> (1 :: Int) `shouldBe` 1
+               Just (_,k) -> k f `shouldBe` False
 
-v :: Maybe (a, t -> Bool) -> t -> Expectation
-v mv f = snd (fromJust mv) f `shouldBe` True
-vn :: Maybe (a, t -> Bool) -> t -> Expectation
-vn mv f = case mv of
-            Nothing -> (1 :: Int) `shouldBe` 1
-            Just (_,k) -> k f `shouldBe` False
+shouldSatisfyIO a b = do x <- a
+                         x `shouldSatisfy` b
 
 t1 :: Text -> Text -> Bool
 t1 = (==)
@@ -103,25 +117,27 @@ main = hspec $ do
                (_p ["a", "b"] $ q [("id", Just "x")])) t3u
     it "should apply matchers with ==>" $
       do (path "a" ==> const ()) rr (p ["a"])
-           `shouldSatisfy` isJust
+           `shouldSatisfyIO` isJust
          (segment ==> \_ (_ :: Text) -> ()) rr (p ["1"])
-            `shouldSatisfy` isJust
+            `shouldSatisfyIO` isJust
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
            rr (p ["a", "b"])
-           `shouldSatisfy` fromJust
+           `shouldSatisfyIO` fromJust
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
            rr (p ["a", "a"])
-           `shouldSatisfy` isNothing
+           `shouldSatisfyIO` isNothing
          (segment // path "b" ==> \_ x -> x == ("a" :: Text))
            rr (p ["a"])
-           `shouldSatisfy` isNothing
+           `shouldSatisfyIO` isNothing
     it "should always pass a value with paramOpt" $
-      do snd (fromJust (paramOpt "id" (q [])))
+      do x <- paramOpt "id" (q [])
+         snd (fromJust x)
              (isLeft :: Either ParamError [Text] -> Bool)
              `shouldBe` True
-         snd (fromJust (paramOpt "id" (q [("id", Just "foo")])))
-                            (== Right (["foo"] :: [Text]))
-                            `shouldBe` True
+         y <- paramOpt "id" (q [("id", Just "foo")])
+         snd (fromJust y)
+             (== Right (["foo"] :: [Text]))
+             `shouldBe` True
     it "should match end against no further path segments" $
       do j (end (p []))
          j (end (_p [] $ q [("foo", Nothing)]))

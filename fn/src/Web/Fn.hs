@@ -28,6 +28,7 @@ module Web.Fn ( -- * Application setup
               , toWAI
                 -- * Routing
               , Req
+              , Route
               , route
               , fallthrough
               , (==>)
@@ -86,6 +87,8 @@ data Store b a = Store b (b -> a)
 instance Functor (Store b) where
   fmap f (Store b h) = Store b (f . h)
 
+-- | The type of a route, constructed with 'pattern ==> handler'.
+type Route ctxt = ctxt -> Req -> IO (Maybe (IO (Maybe Response)))
 
 type PostMVar = Maybe (MVar (Maybe ([Param], [Parse.File LB.ByteString])))
 
@@ -144,7 +147,7 @@ toWAI ctxt f req cont =
 -- @
 route :: RequestContext ctxt =>
          ctxt ->
-         [ctxt -> Req -> IO (Maybe (IO (Maybe Response)))] ->
+         [Route ctxt] ->
          IO (Maybe Response)
 route ctxt pths =
   do let (r,post) = getRequest ctxt

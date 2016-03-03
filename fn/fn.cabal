@@ -1,5 +1,5 @@
 name:                fn
-version:             0.2.0.2
+version:             0.3.0.0
 synopsis:            A functional web framework.
 description:
   A Haskell web framework where you write plain old functions.
@@ -30,7 +30,7 @@ description:
     .
     site :: Ctxt -> IO Response
     site ctxt = route ctxt [ end                        ==> indexH
-    &#32;                      , path &#34;echo&#34; \/? param &#34;msg&#34; ==> echoH
+    &#32;                      , path &#34;echo&#34; \/\/ param &#34;msg&#34; ==> echoH
     &#32;                      , path &#34;echo&#34; \/\/ segment     ==> echoH
     &#32;                      ]
     &#32;                 \`fallthrough\` notFoundText &#34;Page not found.&#34;
@@ -72,7 +72,7 @@ license:             ISC
 license-file:        LICENSE
 author:              Daniel Patterson <dbp@dbpmail.net>
 maintainer:          dbp@dbpmail.net
-copyright:           2015 Daniel Patterson
+copyright:           2016 Daniel Patterson
 category:            Web
 build-type:          Simple
 extra-source-files:  CHANGELOG.md

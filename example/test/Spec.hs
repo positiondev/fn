@@ -50,3 +50,6 @@ main = do
        describe "GET /../fn-example.cabal" $
          it "should 404" $
             get "/../fn-example.cabal" `shouldRespondWith` 404
+       describe "POST /form with 'form.x'" $
+         it "should show param in body" $
+            postHtmlForm "/form" [("form.x", "foobar")] `shouldRespondWith` "foobar"

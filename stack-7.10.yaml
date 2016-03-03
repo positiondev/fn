@@ -11,6 +11,7 @@ extra-deps:
 - logging-3.0.2
 - wai-session-clientsession-0.1
 - cereal-text-0.1.0.1
+- digestive-functors-heist-0.8.6.2
 
 flags: {}
 

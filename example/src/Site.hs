@@ -24,9 +24,12 @@ import           Network.HTTP.Types.Method
 import           Network.Wai
 import           Network.Wai.Session               (Session, withSession)
 import           Network.Wai.Session.ClientSession (clientsessionStore)
+import           Text.Digestive.Form               hiding (file)
+import           Text.Digestive.Heist
 import qualified Text.XmlHtml                      as X
 import           Web.ClientSession                 (randomKey)
 import           Web.Fn
+import           Web.Fn.Extra.Digestive
 import           Web.Fn.Extra.Heist
 
 data Ctxt = Ctxt { _req   :: FnRequest
@@ -98,13 +101,13 @@ site :: Ctxt -> IO Response
 site ctxt =
   route ctxt [end ==> indexHandler
              ,path "param" // param "id" !=> paramHandler
-             ,path "param_many" // param "id" !=> paramManyHandler
-             ,path "template" ==> templateHandler
+             ,path "param_many" // param "id" !=> paramManyHandler             ,path "template" ==> templateHandler
              ,path "db" // param "number" ==> dbHandler
              ,path "segment" // segment // end ==> segmentHandler
              ,path "redis" // segment // paramOpt "set" ==> redisHandler
              ,path "session" ==> sessionHandler
              ,path "file" ==> fileHandler
+             ,path "form" ==> formHandler
              ,anything ==> heistServe
              ,anything ==> staticServe "static"
              ]
@@ -113,7 +116,7 @@ site ctxt =
 indexHandler :: Ctxt -> IO (Maybe Response)
 indexHandler _ =
   okText ("Try /param?id=123, /template, /db?number=123, /segment/foo,"
-       <> " /redis/key, /redis/key?set=new, /session, or /file, /haskell.png")
+       <> " /redis/key, /redis/key?set=new, /session, /file, /form, or /haskell.png")
 
 paramHandler :: Ctxt -> Int  -> IO (Maybe Response)
 paramHandler _ i =
@@ -167,3 +170,16 @@ fileHandler ctxt = route ctxt [method GET              ==> const (render ctxt "f
                               ,method POST // file "f" !=> fileH]
   where fileH _ (File name ct _) =
           okText ("Got file named " <> name <> " of type " <> ct)
+
+formHandler :: Ctxt -> IO (Maybe Response)
+formHandler ctxt =
+  runForm ctxt "form"
+               ("x" .: check "Must not be empty"
+                             (not . T.null)
+                             (text Nothing)) $
+         \r -> case r of
+                 (v, Nothing) ->
+                   renderWithSplices ctxt
+                                     "form"
+                                     (digestiveSplices v)
+                 (_, Just t) -> okText t

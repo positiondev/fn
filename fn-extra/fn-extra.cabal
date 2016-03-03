@@ -1,5 +1,5 @@
 name:                fn-extra
-version:             0.2.0.1
+version:             0.3.0.0
 synopsis:            Extras for Fn, a functional web framework.
 description:         Please see README.
 homepage:            http://github.com/dbp/fn#readme
@@ -17,18 +17,23 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Web.Fn.Extra.Heist
+                     , Web.Fn.Extra.Digestive
   build-depends:       base >= 4.7 && < 5
                      , heist
                      , xmlhtml
                      , http-types
                      , wai
                      , wai-util
+                     , wai-extra
+                     , resourcet
                      , mtl
                      , text
                      , blaze-builder
                      , bytestring
                      , lens
+                     , directory
                      , either
+                     , digestive-functors
                      , fn
   default-language:    Haskell2010
   ghc-options:         -Wall

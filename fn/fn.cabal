@@ -8,7 +8,7 @@ description:
   .
   @
     #!\/usr\/bin\/env stack
-    \-\- stack --resolver lts-3.10 --install-ghc runghc --package fn
+    \-\- stack --resolver lts-5.5 --install-ghc runghc --package fn
     &#123;-&#35; LANGUAGE OverloadedStrings &#35;-&#125;
     import Data.Monoid ((&#60;&#62;))
     import Data.Text (Text)

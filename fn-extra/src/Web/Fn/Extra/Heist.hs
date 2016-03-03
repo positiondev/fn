@@ -6,8 +6,8 @@ This module contains helpers to make Heist fit in more closely within
 `Fn`'s stance against monad transformers and for regular functions.
 
 In particular, it instantiates the Monad for HeistState to be a
-ReaderT that contains our context, so that in the splices we can get
-the context out.
+StateT that contains our context, so that in the splices we can get
+the context out (and modify it if needed).
 
 Further, we add splice builders that work similar to our url
 routing - splices are declared to have certain attributes of specific
@@ -39,7 +39,7 @@ import           Blaze.ByteString.Builder
 import           Control.Applicative        ((<$>))
 import           Control.Arrow              (first)
 import           Control.Lens
-import           Control.Monad.Reader
+import           Control.Monad.State
 import           Control.Monad.Trans.Either
 import           Data.Monoid
 import           Data.Text                  (Text)
@@ -47,22 +47,29 @@ import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
 import           Data.Text.Read             (decimal, double)
 import           Heist
-import           Heist.Interpreted
+import qualified Heist.Compiled             as C
+import qualified Heist.Interpreted          as I
 import           Network.HTTP.Types
 import           Network.Wai
 import qualified Network.Wai.Util           as W
 import qualified Text.XmlHtml               as X
 import           Web.Fn
 
--- | The type of our state. We need a ReaderT to be able to pass the
+-- | The type of our state. We need a StateT to be able to pass the
 -- runtime context (which includes the current request) into the
 -- splices.
-type FnHeistState ctxt = HeistState (ReaderT ctxt IO)
+type FnHeistState ctxt = HeistState (StateT ctxt IO)
 
--- | The type of our splice. We need a ReaderT to be able to pass the
--- runtime context (which includes the current request) into the
--- splice.
-type FnSplice ctxt = Splice (ReaderT ctxt IO)
+-- | The type of our splice (interpreted version). We need a StateT to
+-- be able to pass the runtime context (which includes the current
+-- request) into the splice (and sometimes modify it).
+type FnSplice ctxt = I.Splice (StateT ctxt IO)
+
+-- | The type of our splice (compiled version). We need a StateT to
+-- be able to pass the runtime context (which includes the current
+-- request) into the splice (and sometimes modify it).
+type FnCSplice ctxt = C.Splice (StateT ctxt IO)
+
 
 -- | In order to have render be able to get the 'FnHeistState' out of
 -- our context, we need this helper class.
@@ -70,24 +77,26 @@ class HeistContext ctxt where
   getHeist :: ctxt -> FnHeistState ctxt
 
 -- | Initialize heist. This takes a list of paths to template
--- directories and a set of interpreted splices. Currently, we don't
--- have support for compiled splices yet (so you can drop down to just
--- plain Heist if you want them).
+-- directories, a set of interpreted splices, and a set of compiled
+-- splices (you can pass @mempty@ as either)
 heistInit :: HeistContext ctxt =>
              [Text] ->
-             Splices (Splice (ReaderT ctxt IO)) ->
+             Splices (FnSplice ctxt) ->
+             Splices (FnCSplice ctxt) ->
              IO (Either [String] (FnHeistState ctxt))
-heistInit templateLocations splices =
+heistInit templateLocations isplices csplices =
   do let ts = map (loadTemplates . T.unpack) templateLocations
      runEitherT $ initHeist (emptyHeistConfig & hcTemplateLocations .~ ts
-                                    & hcInterpretedSplices .~ splices
+                                    & hcInterpretedSplices .~ isplices
                                     & hcLoadTimeSplices .~ defaultLoadTimeSplices
+                                    & hcCompiledSplices .~ csplices
                                     & hcNamespace .~ "")
 
--- | Render templates according to the request path. Note that if you
--- have matched some parts of the path, those will not be included in
--- the path used to find the templates. For example, if you have
--- @foo\/bar.tpl@ in the directory where you loaded templates from,
+-- | Render interpreted templates according to the request path. Note
+-- that if you have matched some parts of the path, those will not be
+-- included in the path used to find the templates. For example, if
+-- you have @foo\/bar.tpl@ in the directory where you loaded templates
+-- from,
 --
 -- > path "foo" ==> heistServe
 --
@@ -95,15 +104,20 @@ heistInit templateLocations splices =
 --
 -- > anything ==> heistServe
 --
+-- This will also try the path followed by "index" if the first
+-- doesn't match, so if you have @foo\/index.tpl@, the path @foo@ will
+-- be matched to it.
+--
 -- If no template is found, this will continue routing.
 heistServe :: (RequestContext ctxt, HeistContext ctxt) =>
               ctxt ->
               IO (Maybe Response)
 heistServe ctxt =
   let p = pathInfo . fst $ getRequest ctxt in
-  render ctxt (T.intercalate "/" p)
+  mplus <$> render ctxt (T.intercalate "/" p)
+        <*> render ctxt (T.intercalate "/" (p ++ ["index"]))
 
--- | Render a single template by name.
+-- | Render a single interpreted heist template by name.
 render :: HeistContext ctxt =>
           ctxt ->
           Text ->
@@ -118,10 +132,30 @@ renderWithSplices :: HeistContext ctxt =>
                      Splices (FnSplice ctxt) ->
                      IO (Maybe Response)
 renderWithSplices ctxt name splices =
-  do r <- runReaderT (renderTemplate (bindSplices splices (getHeist ctxt)) (T.encodeUtf8 name)) ctxt
+  do (r,_) <- runStateT (I.renderTemplate (I.bindSplices splices (getHeist ctxt)) (T.encodeUtf8 name)) ctxt
      case first toLazyByteString <$> r of
        Nothing -> return Nothing
        Just (h,m) -> Just <$> W.bytestring status200 [(hContentType, m)] h
+
+-- | Render a single compiled heist template by name.
+cRender :: HeistContext ctxt => ctxt -> Text -> IO (Maybe Response)
+cRender ctxt tmpl =
+  let mr = C.renderTemplate (getHeist ctxt) (T.encodeUtf8 tmpl) in
+  case mr of
+    Nothing -> return Nothing
+    Just (rc, ct) ->
+      do (builder, _) <- runStateT rc ctxt
+         return $ Just $ responseBuilder status200 [(hContentType, ct)] builder
+
+
+-- | Like 'heistServe', but for compiled templates.
+cHeistServe :: (RequestContext ctxt, HeistContext ctxt) =>
+               ctxt ->
+               IO (Maybe Response)
+cHeistServe ctxt =
+  do let p = pathInfo . fst $ getRequest ctxt
+     mplus <$> cRender ctxt (T.intercalate "/" p)
+           <*> cRender ctxt (T.intercalate "/" (p ++ ["index"]))
 
 
 -- | In order to make splice definitions more functional, we declare
@@ -166,7 +200,7 @@ tag :: Text ->
        (ctxt -> X.Node -> k) ->
        Splices (FnSplice ctxt)
 tag name match handle =
-  name ## do ctxt <- lift ask
+  name ## do ctxt <- lift get
              node <- getParamNode
              case match node (handle ctxt node) of
                Nothing -> do tellSpliceError $
@@ -180,7 +214,7 @@ tag' :: Text ->
         (ctxt -> X.Node -> FnSplice ctxt) ->
         Splices (FnSplice ctxt)
 tag' name handle =
-  name ## do ctxt <- lift ask
+  name ## do ctxt <- lift get
              node <- getParamNode
              handle ctxt node
 

@@ -64,6 +64,7 @@ initializer =
   do hs' <- heistInit
               ["templates"]
               exampleSplices
+              mempty
      let hs = case hs' of
                 Left ers -> errorL' ("Heist failed to load templates: \n" <> T.intercalate "\n" (map T.pack ers))
                 Right hs'' -> hs''

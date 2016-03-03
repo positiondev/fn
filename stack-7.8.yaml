@@ -16,6 +16,7 @@ extra-deps:
 - bytestring-lexing-0.5.0.2
 - time-locale-compat-0.1.1.1
 - digestive-functors-heist-0.8.6.2
+- digestive-functors-0.8.0.1
 
 flags: {}
 

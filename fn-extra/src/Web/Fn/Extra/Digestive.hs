@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections     #-}
 module Web.Fn.Extra.Digestive (runForm) where
 
+import           Control.Applicative          ((<$>))
 import           Control.Arrow                (second)
 import           Control.Concurrent.MVar      (readMVar)
 import           Control.Monad.Trans          (liftIO)

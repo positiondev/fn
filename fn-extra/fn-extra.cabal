@@ -7,7 +7,7 @@ license:             ISC
 license-file:        LICENSE
 author:              Daniel Patterson <dbp@dbpmail.net>
 maintainer:          Daniel Patterson <dbp@dbpmail.net>
-copyright:           2015 Daniel Patterson
+copyright:           2016 Daniel Patterson
 category:            Web
 build-type:          Simple
 extra-source-files:  CHANGELOG.md

@@ -47,3 +47,6 @@ main = do
          it "should respond with [100,200]" $
            postHtmlForm "/param_many" [("id", "100")
                                       ,("id", "200")] `shouldRespondWith` "[100,200]"
+       describe "GET /../fn-example.cabal" $
+         it "should 404" $
+            get "/../fn-example.cabal" `shouldRespondWith` 404

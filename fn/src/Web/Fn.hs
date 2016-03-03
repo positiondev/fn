@@ -259,11 +259,14 @@ mimeMap =  HM.fromList [
 --
 -- > anything ==> staticServe "static"
 --
--- If no file is found, this will continue routing.
+-- If no file is found, or if the path has @..@ or starts with @/@,
+-- this will continue routing.
 staticServe :: RequestContext ctxt => Text -> ctxt -> IO (Maybe Response)
 staticServe d ctxt = do
-  let pth = T.unpack $ T.intercalate "/" $  d : pathInfo (fst . getRequest $ ctxt)
-  sendFile pth
+  let pth = T.intercalate "/" $  d : pathInfo (fst . getRequest $ ctxt)
+  if "/" `T.isPrefixOf` pth || ".." `T.isInfixOf` pth
+     then return Nothing
+     else sendFile (T.unpack pth)
 
 -- | Sends a specific file specified by path. It will specify the
 -- content-type if it can figure it out by the file extension.

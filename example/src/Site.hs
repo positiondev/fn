@@ -97,7 +97,7 @@ site :: Ctxt -> IO Response
 site ctxt =
   route ctxt [end ==> indexHandler
              ,path "param" // param "id" !=> paramHandler
-             ,path "param_many" // paramMany "id" !=> paramManyHandler
+             ,path "param_many" // param "id" !=> paramManyHandler
              ,path "template" ==> templateHandler
              ,path "db" // param "number" ==> dbHandler
              ,path "segment" // segment // end ==> segmentHandler

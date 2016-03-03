@@ -41,7 +41,7 @@ main = do context <- initializer
 app :: Ctxt -> IO Response
 app ctxt =
   route ctxt [ end ==> index
-             , path "foo" // segment // path "baz" /? param "id" ==> handler]
+             , path "foo" // segment // path "baz" // param "id" ==> handler]
     `fallthrough` notFoundText "Page not found."
 
 index :: IO (Maybe Response)

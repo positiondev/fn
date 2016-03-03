@@ -1,4 +1,10 @@
-* 0.2.0.1 Daniel Patterson <dbp@dbpmail.net> 2015-1-20
+* 0.3.0.0 Daniel Patterson <dbp@dbpmail.net> 2016-3-2
+
+  - Switch Heist to use StateT rather than ReaderT, so splices can
+    update context.
+  - Add support for compiled heist.
+
+* 0.2.0.1 Daniel Patterson <dbp@dbpmail.net> 2016-1-20
 
   - Fix for GHC 7.8.4, which cabal file said would work, but didn't.
 

@@ -20,12 +20,15 @@ module Web.Fn.Extra.Heist ( -- * Types
                             HeistContext(..)
                           , FnHeistState
                           , FnSplice
+                          , FnCSplice
                             -- * Initializer
                           , heistInit
                             -- * Rendering templates
                           , heistServe
                           , render
                           , renderWithSplices
+                          , cHeistServe
+                          , cRender
                             -- * Building splices
                           , tag
                           , tag'

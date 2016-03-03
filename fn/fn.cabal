@@ -4,11 +4,11 @@ synopsis:            A functional web framework.
 description:
   A Haskell web framework where you write plain old functions.
   .
-  /Provided you have/ <https://github.com/commercialhaskell/stack#readme stack> /installed, you can run this example like a shell script:/
+  /Provided you have/ <https://github.com/commercialhaskell/stack#readme stack> /installed, you can run this example like a shell script (it'll listen on port 3000):/
   .
   @
     #!\/usr\/bin\/env stack
-    \-\- stack --resolver lts-5.5 --install-ghc runghc --package fn
+    \-\- stack --resolver lts-5.5 --install-ghc runghc --package fn --package warp
     &#123;-&#35; LANGUAGE OverloadedStrings &#35;-&#125;
     import Data.Monoid ((&#60;&#62;))
     import Data.Text (Text)

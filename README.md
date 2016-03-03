@@ -71,9 +71,16 @@ used in the example application included in the repository):
 - [heist](http://hackage.haskell.org/package/heist)`[*]`: a wonderful
   templating system that is both really simple (the templates are just
   html) and powerful (any html tag can be bound to run haskell
-  code). This is one library that has adaptors in `fn-extra`, as we
+  code). This is a library that has adaptors in `fn-extra`, as we
   wanted to have splices (those haskell-bound html tags) that were
   normal functions, rather than monadic.
+- [digestive-functors](http://hackage.haskell.org/package/heist)`[*]`:
+  a library for writing composable forms (which handle data
+  validation/conversions). This library has an adaptor in `fn-extra`,
+  because there isn't a working library based on plain WAI (the one
+  that exists implements form paths in a way that is incompatible with
+  how the rest of the digestive functors family works, so, for
+  example, you can't combine it with `digestive-functors-heist`.)
 - [postgresql-simple](https://hackage.haskell.org/package/postgresql-simple)`[*]`:
   a well designed interface to PostgreSQL; ofter the lower level way
   to interact with the database (setting up connections, etc), if you

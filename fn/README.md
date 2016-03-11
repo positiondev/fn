@@ -5,6 +5,6 @@
 
 ## Example
 
-See the [example application](https://github.com/dbp/fn/tree/master/example)
+See the [example application](https://github.com/positiondev/fn/tree/master/example)
 in the repository for a full usage including database access, heist
 templates, sessions, etc.

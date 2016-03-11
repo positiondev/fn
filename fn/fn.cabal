@@ -67,12 +67,12 @@ description:
   where all necessary data is passed via function arguments, and control
   flow is mediated by return values.
 
-homepage:            http://github.com/dbp/fn#readme
+homepage:            http://github.com/positiondev/fn#readme
 license:             ISC
 license-file:        LICENSE
 author:              Daniel Patterson <dbp@dbpmail.net>
-maintainer:          dbp@dbpmail.net
-copyright:           2016 Daniel Patterson
+maintainer:          workers@positiondev.com
+copyright:           2016 Position Development, LLC.
 category:            Web
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
@@ -114,4 +114,4 @@ test-suite fn-test
 
 source-repository head
   type:     git
-  location: https://github.com/dbp/fn
+  location: https://github.com/positiondev/fn

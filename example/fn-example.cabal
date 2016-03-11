@@ -2,12 +2,12 @@ name:                fn-example
 version:             0.1.0.0
 synopsis:            An example application using fn.
 description:         Please see README.
-homepage:            http://github.com/dbp/fn#readme
+homepage:            http://github.com/positiondev/fn#readme
 license:             ISC
 license-file:        LICENSE
 author:              Daniel Patterson <dbp@dbpmail.net>
-maintainer:          dbp@dbpmail.net
-copyright:           2015 Daniel Patterson
+maintainer:          workers@positiondev.com
+copyright:           2016 Position Development, LLC
 category:            Web
 build-type:          Simple
 cabal-version:       >=1.10

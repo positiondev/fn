@@ -2,12 +2,12 @@ name:                fn-extra
 version:             0.3.0.0
 synopsis:            Extras for Fn, a functional web framework.
 description:         Please see README.
-homepage:            http://github.com/dbp/fn#readme
+homepage:            http://github.com/positiondev/fn#readme
 license:             ISC
 license-file:        LICENSE
 author:              Daniel Patterson <dbp@dbpmail.net>
-maintainer:          Daniel Patterson <dbp@dbpmail.net>
-copyright:           2016 Daniel Patterson
+maintainer:          workers@positiondev.com
+copyright:           2016 Position Development, LLC
 category:            Web
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
@@ -41,4 +41,4 @@ library
 
 source-repository head
   type:     git
-  location: https://github.com/dbp/fn-extra
+  location: https://github.com/positiondev/fn

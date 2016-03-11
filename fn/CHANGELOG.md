@@ -1,3 +1,7 @@
+* 0.3.0.1 Daniel Patterson <dbp@dbpmail.net> 2016-3-11
+
+  - Change repository location, copyright.
+
 * 0.3.0.0 Daniel Patterson <dbp@dbpmail.net> 2016-3-2
 
   - Don't parse request body by default, to make `Fn` play well with

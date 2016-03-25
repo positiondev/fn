@@ -171,7 +171,7 @@ route :: RequestContext ctxt =>
 route ctxt pths =
   do let (r,post) = getRequest ctxt
          m = either (const GET) id (parseMethod (requestMethod r))
-         req = (filter (/= "") (pathInfo r), queryString r, m, post)
+         req = (r, filter (/= "") (pathInfo r), queryString r, m, post)
      route' req pths
   where route' _ [] = return Nothing
         route' req (x:xs) =
@@ -300,7 +300,7 @@ sendFile pth =
         else return Nothing
 
 -- | The parts of the path, when split on /, and the query.
-type Req = ([Text], Query, StdMethod, PostMVar)
+type Req = (Request, [Text], Query, StdMethod, PostMVar)
 
 -- | The non-body parsing connective between route patterns and the
 -- handler that will be called if the pattern matches. The type is not
@@ -317,13 +317,22 @@ type Req = ([Text], Query, StdMethod, PostMVar)
    do rsp <- match req
       case rsp of
         Nothing -> return Nothing
-        Just ((pathInfo',_,_,_), k) ->
+        Just ((_,pathInfo',_,_,_), k) ->
           let (request, mv) = getRequest ctxt in
           return $ Just (k $ handle (setRequest ctxt (request { pathInfo = pathInfo' }, mv)))
 
 -- | Internal helper - uses the name of the file as the pattern.
 tempFileBackEnd' :: InternalState -> ignored1 -> FileInfo () -> IO ByteString -> IO FilePath
 tempFileBackEnd' is x fi@(FileInfo nm _ _) = Parse.tempFileBackEndOpts getTemporaryDirectory (T.unpack $ T.decodeUtf8 nm) is x fi
+
+readBody mv request =
+  modifyMVar_ mv
+    (\r -> case r of
+             Nothing ->
+               do is <- createInternalState
+                  rb <- parseRequestBody (tempFileBackEnd' is) request
+                  return (Just (rb, is))
+             Just _ -> return r)
 
 -- | The connective between route patterns and the handler that parses
 -- the body, which allows post params to be extracted with 'param' and
@@ -336,15 +345,11 @@ tempFileBackEnd' is x fi@(FileInfo nm _ _) = Parse.tempFileBackEndOpts getTempor
          IO (Maybe a)
 (match !=> handle) ctxt req =
    do let (request, Just mv) = getRequest ctxt
-      modifyMVar_ mv (\r -> case r of
-                              Nothing -> do is <- createInternalState
-                                            rb <- parseRequestBody (tempFileBackEnd' is) request
-                                            return (Just (rb, is))
-                              Just _ -> return r)
+      readBody mv request
       rsp <- match req
       case rsp of
         Nothing -> return Nothing
-        Just ((pathInfo',_,_,_), k) ->
+        Just ((_,pathInfo',_,_,_), k) ->
           do return $ Just (k $ handle (setRequest ctxt (request { pathInfo = pathInfo' }, Just mv)))
 
 -- | Connects two path segments. Note that when normally used, the
@@ -375,7 +380,7 @@ tempFileBackEnd' is x fi@(FileInfo nm _ _) = Parse.tempFileBackEndOpts getTempor
 path :: Text -> Req -> IO (Maybe (Req, a -> a))
 path s req =
   return $ case req of
-             (y:ys,q,m,x) | y == s -> Just ((ys, q, m, x), id)
+             (r,y:ys,q,m,x) | y == s -> Just ((r,ys, q, m, x), id)
              _               -> Nothing
 
 -- | Matches there being no parts of the path left. This is useful when
@@ -383,7 +388,7 @@ path s req =
 end :: Req -> IO (Maybe (Req, a -> a))
 end req =
   return $ case req of
-             ([],_,_,_) -> Just (req, id)
+             (_,[],_,_,_) -> Just (req, id)
              _ -> Nothing
 
 -- | Matches anything.
@@ -396,14 +401,14 @@ anything req = return $ Just (req, id)
 segment :: FromParam p => Req -> IO (Maybe (Req, (p -> a) -> a))
 segment req =
   return $ case req of
-             (y:ys,q,m,x) -> case fromParam [y] of
-                               Left _ -> Nothing
-                               Right p -> Just ((ys, q, m, x), \k -> k p)
+             (r,y:ys,q,m,x) -> case fromParam [y] of
+                                 Left _ -> Nothing
+                                 Right p -> Just ((r, ys, q, m, x), \k -> k p)
              _     -> Nothing
 
 -- | Matches on a particular HTTP method.
 method :: StdMethod -> Req -> IO (Maybe (Req, a -> a))
-method m r@(_,_,m',_) | m == m' = return $ Just (r, id)
+method m r@(_,_,_,m',_) | m == m' = return $ Just (r, id)
 method _ _ = return Nothing
 
 data ParamError = ParamMissing | ParamTooMany | ParamUnparsable | ParamOtherError Text deriving (Eq, Show)
@@ -469,7 +474,7 @@ getMVarParams mv = case mv of
 -- match query parameters.
 param :: FromParam p => Text -> Req -> IO (Maybe (Req, (p -> a) -> a))
 param n req =
-  do let (_,q,_,mv) = req
+  do let (_,_,q,_,mv) = req
      ps <- getMVarParams mv
      return $ case findParamMatches n (q ++ map (second Just) ps) of
                 Right y -> Just (req, \k -> k y)
@@ -481,7 +486,7 @@ param n req =
 -- handler, it won't match.
 paramMany :: FromParam p => Text -> Req -> IO (Maybe (Req, ([p] -> a) -> a))
 paramMany n req =
-  do let (_,q,_,mv) = req
+  do let (_,_,q,_,mv) = req
      ps <- getMVarParams mv
      return $ case findParamMatches n (q ++ map (second Just) ps) of
                 Left _ -> Nothing
@@ -501,7 +506,7 @@ paramOpt :: FromParam p =>
             Req ->
             IO (Maybe (Req, (Either ParamError p -> a) -> a))
 paramOpt n req =
-  do let (_,q,_,mv) = req
+  do let (_,_,q,_,mv) = req
      ps <- getMVarParams mv
      return $ Just (req, \k -> k (findParamMatches n (q ++ map (second Just) ps)))
 
@@ -512,47 +517,33 @@ data File = File { fileName        :: Text
                  , filePath        :: FilePath
                  }
 
-getMVarFiles mv = case mv of
-                    Nothing -> error $ "Fn: tried to read a 'file' or 'files', but FnRequest wasn't initialized with MVar."
-                    Just mv' -> do
-                      v <- readMVar mv'
-                      case v of
-                        Nothing -> error $ "Fn: tried to read a 'file' or 'files' from the request without parsing the body with '!=>'"
-                        Just ((_,fs'),_) -> return fs'
+getMVarFiles mv req =
+  case mv of
+    Nothing -> error $ "Fn: tried to read a 'file' or 'files', but FnRequest wasn't initialized with MVar."
+    Just mv' -> do
+      -- NOTE(dbp 2016-03-25): readBody ensures that the value will be Just.
+      readBody mv' req
+      Just ((_,fs'),_) <- readMVar mv'
+      return $ map (\(n, FileInfo nm ct c) ->
+                     (T.decodeUtf8 n, File (T.decodeUtf8 nm)
+                                           (T.decodeUtf8 ct)
+                                           c)) fs'
 
 -- | Matches an uploaded file with the given parameter name.
---
--- Note: You must use the '!=>' connective between the pattern and the
--- handler, or else the request body will not have been parsed and
--- this will fail.
 file :: Text -> Req -> IO (Maybe (Req, (File -> a) -> a))
 file n req =
-  do let (_,_,_,mv) = req
-     fs <- getMVarFiles mv
-     return $ case filter ((== T.encodeUtf8 n) . fst) fs of
-                [(_, FileInfo nm ct c)] -> Just (req, \k -> k (File (T.decodeUtf8 nm)
-                                                                    (T.decodeUtf8 ct)
-                                                                    c))
+  do let (r,_,_,_,mv) = req
+     fs <- getMVarFiles mv r
+     return $ case filter ((== n) . fst) fs of
+                [(_, f)] -> Just (req, \k -> k f)
                 _ -> Nothing
 
 -- | Matches all uploaded files, passing their parameter names and
 -- contents.
---
--- Note: You must use the '!=>' connective between the pattern and the
--- handler, or else the request body will not have been parsed and
--- this will fail.
 files :: Req -> IO (Maybe (Req, ([(Text, File)] -> a) -> a))
 files req =
-  do let (_,_,_,Just mv) = req
-     v <- readMVar mv
-     let fs' = case v of
-                 Nothing -> error $ "Fn: tried to read a 'file' from the request without parsing the body with '!=>'"
-                 Just ((_,fs),_) -> fs
-     let fs = map (\(n, FileInfo nm ct c) ->
-                 (T.decodeUtf8 n, File (T.decodeUtf8 nm)
-                                       (T.decodeUtf8 ct)
-                                       c))
-              fs'
+  do let (r,_,_,_,mv) = req
+     fs <- getMVarFiles mv r
      return $ Just (req, \k -> k fs)
 
 returnText :: Text -> Status -> ByteString -> IO (Maybe Response)

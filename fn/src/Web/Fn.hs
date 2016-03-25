@@ -59,12 +59,18 @@ module Web.Fn ( -- * Application setup
               , notFoundHtml
               , redirect
               , redirectReferer
+                -- * Helpers
+              , tempFileBackEnd'
   ) where
 
 import qualified Blaze.ByteString.Builder.Char.Utf8 as B
 import           Control.Applicative                ((<$>))
 import           Control.Arrow                      (second)
 import           Control.Concurrent.MVar
+import           Control.Monad                      (join)
+import           Control.Monad.Trans.Resource       (InternalState,
+                                                     closeInternalState,
+                                                     createInternalState)
 import           Data.ByteString                    (ByteString)
 import qualified Data.ByteString.Lazy               as LB
 import           Data.Either                        (lefts, rights)
@@ -80,7 +86,9 @@ import           Network.Wai.Parse                  (FileInfo (..), Param,
                                                      lbsBackEnd,
                                                      parseRequestBody)
 import qualified Network.Wai.Parse                  as Parse
-import           System.Directory                   (doesFileExist)
+import           System.Directory                   (doesFileExist,
+                                                     getTemporaryDirectory,
+                                                     removeFile)
 import           System.FilePath                    (takeExtension)
 
 data Store b a = Store b (b -> a)
@@ -90,7 +98,7 @@ instance Functor (Store b) where
 -- | The type of a route, constructed with 'pattern ==> handler'.
 type Route ctxt = ctxt -> Req -> IO (Maybe (IO (Maybe Response)))
 
-type PostMVar = Maybe (MVar (Maybe ([Param], [Parse.File LB.ByteString])))
+type PostMVar = Maybe (MVar (Maybe (([Param], [Parse.File FilePath]), InternalState)))
 
 -- | A normal WAI 'Request' and the parsed post body (if present). We can
 -- only parse the body once, so we need to have our request (which we
@@ -136,7 +144,12 @@ instance RequestContext FnRequest where
 toWAI :: RequestContext ctxt => ctxt -> (ctxt -> IO Response) -> Application
 toWAI ctxt f req cont =
   do mv <- newMVar Nothing
-     f (setRequest ctxt (req, Just mv)) >>= cont
+     do resp <- f (setRequest ctxt (req, Just mv))
+        posted <- tryTakeMVar mv
+        case join posted of
+          Nothing -> return ()
+          Just (_,is) -> closeInternalState is
+        cont resp
 
 -- | The main construct for Fn, 'route' takes a context (which it will pass
 -- to all handlers) and a list of potential matches (which, once they
@@ -308,6 +321,10 @@ type Req = ([Text], Query, StdMethod, PostMVar)
           let (request, mv) = getRequest ctxt in
           return $ Just (k $ handle (setRequest ctxt (request { pathInfo = pathInfo' }, mv)))
 
+-- | Internal helper - uses the name of the file as the pattern.
+tempFileBackEnd' :: InternalState -> ignored1 -> FileInfo () -> IO ByteString -> IO FilePath
+tempFileBackEnd' is x fi@(FileInfo nm _ _) = Parse.tempFileBackEndOpts getTemporaryDirectory (T.unpack $ T.decodeUtf8 nm) is x fi
+
 -- | The connective between route patterns and the handler that parses
 -- the body, which allows post params to be extracted with 'param' and
 -- allows 'file' to work (otherwise, it will trigger a runtime error).
@@ -320,7 +337,9 @@ type Req = ([Text], Query, StdMethod, PostMVar)
 (match !=> handle) ctxt req =
    do let (request, Just mv) = getRequest ctxt
       modifyMVar_ mv (\r -> case r of
-                              Nothing -> Just <$> parseRequestBody lbsBackEnd request
+                              Nothing -> do is <- createInternalState
+                                            rb <- parseRequestBody (tempFileBackEnd' is) request
+                                            return (Just (rb, is))
                               Just _ -> return r)
       rsp <- match req
       case rsp of
@@ -434,7 +453,7 @@ getMVarParams mv = case mv of
                      Just mv' -> do v <- readMVar mv'
                                     return $ case v of
                                                Nothing -> []
-                                               Just (ps',_) -> ps'
+                                               Just ((ps',_),_) -> ps'
                      Nothing -> return []
 
 -- | Matches on a query parameter of the given name. It is parsed into
@@ -490,7 +509,7 @@ paramOpt n req =
 -- | An uploaded file.
 data File = File { fileName        :: Text
                  , fileContentType :: Text
-                 , fileContent     :: LB.ByteString
+                 , filePath        :: FilePath
                  }
 
 getMVarFiles mv = case mv of
@@ -499,7 +518,7 @@ getMVarFiles mv = case mv of
                       v <- readMVar mv'
                       case v of
                         Nothing -> error $ "Fn: tried to read a 'file' or 'files' from the request without parsing the body with '!=>'"
-                        Just (_,fs') -> return fs'
+                        Just ((_,fs'),_) -> return fs'
 
 -- | Matches an uploaded file with the given parameter name.
 --
@@ -528,7 +547,7 @@ files req =
      v <- readMVar mv
      let fs' = case v of
                  Nothing -> error $ "Fn: tried to read a 'file' from the request without parsing the body with '!=>'"
-                 Just (_,fs) -> fs
+                 Just ((_,fs),_) -> fs
      let fs = map (\(n, FileInfo nm ct c) ->
                  (T.decodeUtf8 n, File (T.decodeUtf8 nm)
                                        (T.decodeUtf8 ct)

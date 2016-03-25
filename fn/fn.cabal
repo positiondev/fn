@@ -92,6 +92,7 @@ library
                      , unordered-containers
                      , filepath
                      , directory
+                     , resourcet
   default-language:    Haskell2010
   ghc-options:         -Wall
 
@@ -109,6 +110,7 @@ test-suite fn-test
                      , unordered-containers
                      , filepath
                      , directory
+                     , resourcet
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   default-language:    Haskell2010
 

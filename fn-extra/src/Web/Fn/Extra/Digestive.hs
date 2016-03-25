@@ -39,31 +39,20 @@ requestFormEnv req = do
      case v of
        Nothing -> liftIO $ parseRequestBody (tempFileBackEnd' st)
                                             (fst req)
-       Just (q,_) -> return (q,[])
+       Just (q,_) -> return q
   return $ queryFormEnv ((map (second Just) query) ++ queryString (fst req)) files
-
-tempFileBackEnd' :: InternalState -> ignored1 -> FileInfo () -> IO ByteString -> IO FilePath
-tempFileBackEnd' is x fi@(FileInfo nm _ _) = tempFileBackEndOpts getTemporaryDirectory (T.unpack $ T.decodeUtf8 nm) is x fi
 
 -- | This function runs a form and passes the function in it's last
 -- argument the result, which is a 'View' and an optional result. If
 -- the request is a get, or if the form failed to validate, the result
 -- will be 'Nothing' and you should render the form (with the errors
 -- from the 'View').
---
--- WARNING: If you have already parsed the request body with '!=>'
--- (even if the route didn't end up matching), this will _only_ get
--- post parameters, it will not see any files that were posted. This
--- is a current implementation limitation that will (hopefully) be
--- resolved eventually, but for now, it is safest to just never use
--- '!=>' if you are using digestive functors (as the expectation is
--- that it will be handling all your POST needs!).
 runForm :: RequestContext ctxt =>
-        ctxt
-     -> Text
-     -> Form v IO a
-     -> ((View v, Maybe a) -> IO a1)
-     -> IO a1
+       ctxt
+    -> Text
+    -> Form v IO a
+    -> ((View v, Maybe a) -> IO a1)
+    -> IO a1
 runForm ctxt nm frm k =
   runResourceT $ let r = fst (getRequest ctxt) in
     if requestMethod r == methodPost

@@ -26,17 +26,17 @@ instance RequestContext R where
 rr :: R
 rr = R ([], [])
 p :: [Text] -> Req
-p y = (y,[],GET,Just emv)
+p y = (defaultRequest,y,[],GET,Just emv)
 _p :: [Text] -> Req ->  Req
-_p y (_,q',m',x') = (y,q',m',x')
+_p y (r,_,q',m',x') = (r,y,q',m',x')
 q :: Query -> Req
-q y = ([],y,GET,Just emv)
+q y = (defaultRequest,[],y,GET,Just emv)
 _q :: Query -> Req -> Req
-_q y (p',_,m',x') = (p',y,m',x')
+_q y (r,p',_,m',x') = (r,p',y,m',x')
 m :: StdMethod -> Req
-m y = ([],[],y,Just emv)
+m y = (defaultRequest,[],[],y,Just emv)
 _m :: StdMethod -> Req -> Req
-_m y (p',q',_,x') = (p',q',y,x')
+_m y (r,p',q',_,x') = (r,p',q',y,x')
 
 
 j :: Show a => IO (Maybe (a,b)) -> Expectation

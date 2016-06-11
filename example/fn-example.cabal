@@ -40,6 +40,7 @@ executable fn-example
                      , data-default
                      , xmlhtml
                      , mtl
+                     , larceny
   default-language:    Haskell2010
 
 test-suite fn-example-test
@@ -72,4 +73,5 @@ test-suite fn-example-test
                      , mtl
                      , hspec
                      , hspec-wai
+                     , larceny
   default-language:    Haskell2010

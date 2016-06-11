@@ -1,17 +1,20 @@
-resolver: lts-3.22
+resolver: lts-5.14
 
 packages:
 - 'fn'
 - 'fn-extra'
 - 'example'
+- location:
+    git: https://github.com/positiondev/larceny.git
+    commit: e0bb006bf095e43821cd8d3023ad95de0ce595ee
+  extra-dep: true
 
 extra-deps:
-- wai-util-0.8
-- http-accept-0.2
-- logging-3.0.2
+- logging-3.0.4
 - wai-session-clientsession-0.1
 - cereal-text-0.1.0.1
 - digestive-functors-heist-0.8.6.2
+- directory-1.2.6.3
 
 flags: {}
 

@@ -52,6 +52,7 @@ module Web.Fn ( -- * Application setup
               , staticServe
               , sendFile
               , okText
+              , okJson
               , okHtml
               , errText
               , errHtml
@@ -556,6 +557,9 @@ returnText text status content =
 plainText :: ByteString
 plainText = "text/plain; charset=utf-8"
 
+applicationJson :: ByteString
+applicationJson = "application/json; charset=utf-8"
+
 html :: ByteString
 html = "text/html; charset=utf-8"
 
@@ -563,6 +567,9 @@ html = "text/html; charset=utf-8"
 okText :: Text -> IO (Maybe Response)
 okText t = returnText t status200 plainText
 
+-- | Returns 'Text' as a JSON response with appropriate header.
+okJson :: Text -> IO (Maybe Response)
+okJson j = returnText j status200 applicationJson
 
 -- | Returns Html (in 'Text') as a response.
 okHtml :: Text -> IO (Maybe Response)

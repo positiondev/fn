@@ -161,6 +161,12 @@ main = hspec $ do
       do r <- route (R (["a", "b"], [])) [path "a" ==> (\c -> route c [path "b" ==> const (okText "")])]
          (responseStatus <$> r) `shouldSatisfy` isJust
 
+  describe "okJson" $ do
+    it "should have Content-Type: applcation/json as a header" $
+      do maybeResponse <- okJson "{'key': 'value'}"
+         let headers = responseHeaders $ fromJust maybeResponse
+         headers `shouldBe` [(hContentType, "application/json; charset=utf-8")]
+
   describe "parameter parsing" $
     do it "should parse Text" $
          fromParam ["hello"] `shouldBe` Right ("hello" :: Text)

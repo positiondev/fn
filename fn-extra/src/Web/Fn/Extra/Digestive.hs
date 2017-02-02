@@ -14,20 +14,21 @@ import qualified Data.Text                    as T
 import qualified Data.Text.Encoding           as T
 import           Network.HTTP.Types.Method
 import           Network.Wai                  (Request (..))
-import           Network.Wai.Parse            (BackEnd, File, FileInfo (..),
-                                               fileContent, parseRequestBody,
+import           Network.Wai.Parse            (File, FileInfo (..), fileContent,
+                                               parseRequestBody,
                                                tempFileBackEndOpts)
 import           System.Directory             (getTemporaryDirectory)
 import           Text.Digestive
 import           Text.Digestive.Types
-import           Text.Digestive.View
 import           Web.Fn                       hiding (File, fileContent)
 
 queryFormEnv :: [(ByteString, Maybe ByteString)] -> [File FilePath] -> Env IO
 queryFormEnv qs fs = \pth ->
-  let qs' = map TextInput $ map (T.decodeUtf8 . fromMaybe "" . snd) $ filter ((==) (fromPath pth) . T.decodeUtf8 . fst) qs
-      fs' = map FileInput $ map (fileContent . snd) $ filter ((==) (fromPath pth) . T.decodeUtf8 . fst) fs
+  let qs' = map TextInput $ map (T.decodeUtf8 . fromMaybe "" . snd) $ filter (forSubForm pth) qs
+      fs' = map FileInput $ map (fileContent . snd) $ filter (forSubForm pth) $ filter fileNameNotEmpty fs
   in return $ qs' ++ fs'
+  where fileNameNotEmpty (formName, fileInfo) = Network.Wai.Parse.fileName fileInfo /= "\"\""
+        forSubForm pth = (==) (fromPath pth) . T.decodeUtf8 . fst
 
 requestFormEnv :: FnRequest -> ResourceT IO (Env IO)
 requestFormEnv req = do

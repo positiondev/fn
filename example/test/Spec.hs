@@ -31,7 +31,7 @@ main = do
            get "/random/path" `shouldRespondWith` 404
        describe "GET /template" $ do
          it "should return html" $
-           get "/template" `shouldRespondWith` 200 { matchHeaders = ["Content-Type" <:> "text/html;charset=utf-8"]}
+           get "/template" `shouldRespondWith` 200 { matchHeaders = ["Content-Type" <:> "text/html; charset=utf-8"]}
          it "should have /template in the response" $
            get "/template" `shouldRespondWith` "<html><body>\n\n  <p>x:/templatex:/template</p>\n\n  <p>hello</p>\n\n</body></html>\n"
        describe "GET /session" $

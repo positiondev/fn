@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import           Control.Applicative      ((<$>))
 import           Control.Exception        (SomeException (..), catch)
 import           Control.Logging
 import           Data.Monoid

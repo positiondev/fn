@@ -4,9 +4,10 @@
 
 module Site where
 
-import           Control.Applicative               ((<$>))
 import           Control.Lens
 import           Control.Logging
+import           Control.Monad                     (mplus)
+import           Control.Monad.State               (StateT, get)
 import           Data.Default                      (def)
 import           Data.Maybe                        (fromMaybe)
 import           Data.Monoid
@@ -20,6 +21,8 @@ import qualified Data.Vault.Lazy                   as Vault
 import qualified Database.PostgreSQL.Simple        as PG
 import qualified Database.Redis                    as R
 import           Heist
+import           Larceny                           (a, (%))
+import qualified Larceny                           as L
 import           Network.HTTP.Types.Method
 import           Network.Wai
 import           Network.Wai.Session               (Session, withSession)
@@ -32,8 +35,11 @@ import           Web.Fn
 import           Web.Fn.Extra.Digestive
 import           Web.Fn.Extra.Heist
 
+
 data Ctxt = Ctxt { _req   :: FnRequest
                  , _heist :: FnHeistState Ctxt
+                 , _lib   :: L.Library Ctxt
+                 , _fills :: L.Substitutions Ctxt
                  , _db    :: Pool PG.Connection
                  , _redis :: R.Connection
                  , _sess  :: Vault.Key (Session IO Text Text)
@@ -46,6 +52,17 @@ instance RequestContext Ctxt where
 
 instance HeistContext Ctxt where
   getHeist = _heist
+
+exampleFills :: L.Substitutions Ctxt
+exampleFills =
+  L.fills [ ("current-url", L.useAttrs ((a"n" % a"prefix") (\n p _t -> currentUrlFill n p)))
+          , ("hello"      , L.text "hello")]
+
+currentUrlFill :: Int -> Maybe Text -> StateT Ctxt IO Text
+currentUrlFill rep prefix = do
+  ctxt <- get
+  let u = T.decodeUtf8 . rawPathInfo $ ctxt ^. req . _1
+  return $ T.concat $ replicate rep (fromMaybe "" prefix <> u)
 
 exampleSplices :: Splices (FnSplice Ctxt)
 exampleSplices = do
@@ -61,6 +78,20 @@ currentUrlSplice ctxt _ rep pref =
 helloSplice :: Ctxt -> X.Node -> FnSplice Ctxt
 helloSplice _ _ = return [ X.TextNode "hello" ]
 
+toResponse :: IO (Maybe Text) -> IO (Maybe Response)
+toResponse imt = do
+  mt <- imt
+  case mt of
+    Just x -> okText x
+    Nothing -> return Nothing
+
+larcenyServe :: Ctxt -> IO (Maybe Response)
+larcenyServe ctxt = do
+  let tplPath = pathInfo . fst $ getRequest ctxt
+  let lRender p = toResponse $
+                   L.renderWith (ctxt ^. lib) (ctxt ^. fills) ctxt p
+  mplus <$> lRender tplPath
+        <*> lRender (tplPath ++ ["index"])
 
 initializer :: IO Ctxt
 initializer =
@@ -71,6 +102,7 @@ initializer =
      let hs = case hs' of
                 Left ers -> errorL' ("Heist failed to load templates: \n" <> T.intercalate "\n" (map T.pack ers))
                 Right hs'' -> hs''
+     tplLib <- L.loadTemplates "templates"
      pgpool <- createPool (PG.connect (PG.ConnectInfo "localhost"
                                                       5432
                                                       "fn_user"
@@ -79,7 +111,7 @@ initializer =
                           PG.close 1 60 20
      rconn <- R.connect R.defaultConnectInfo
      session <- Vault.newKey
-     return (Ctxt defaultFnRequest hs pgpool rconn session)
+     return (Ctxt defaultFnRequest hs tplLib exampleFills pgpool rconn session)
 
 app :: IO (Application, IO ())
 app =
@@ -108,7 +140,8 @@ site ctxt =
              ,path "session" ==> sessionHandler
              ,path "file" ==> fileHandler
              ,path "form" ==> formHandler
-             ,anything ==> heistServe
+             ,anything ==> larcenyServe
+         --  ,anything ==> heistServe
              ,anything ==> staticServe "static"
              ]
     `fallthrough` notFoundText "Page not found."
@@ -128,10 +161,10 @@ paramManyHandler _ is =
 
 templateHandler :: Ctxt -> IO (Maybe Response)
 templateHandler ctxt =
-  do t <- render ctxt "template"
+  do t <- L.renderWith (_lib ctxt) (_fills ctxt) ctxt ["template"]
      case t of
        Nothing -> okText "Could not find template. Did you start application from example directory?"
-       Just _ -> return t
+       Just t' -> okHtml t'
 
 dbHandler :: Ctxt -> Int ->  IO (Maybe Response)
 dbHandler ctxt n =

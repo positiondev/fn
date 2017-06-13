@@ -1,5 +1,5 @@
 name:                fn-extra
-version:             0.3.0.1
+version:             0.3.0.2
 synopsis:            Extras for Fn, a functional web framework.
 description:         Please see README.
 homepage:            http://github.com/positiondev/fn#readme
@@ -18,7 +18,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Web.Fn.Extra.Heist
                      , Web.Fn.Extra.Digestive
-  build-depends:       base >= 4.7 && < 5
+  build-depends:       base >= 4.7 && < 6
                      , heist
                      , xmlhtml
                      , http-types

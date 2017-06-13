@@ -1,0 +1,20 @@
+resolver: lts-8.15
+
+packages:
+- 'fn'
+- 'fn-extra'
+- 'example'
+
+extra-deps:
+- digestive-functors-0.8.2.0
+- digestive-functors-heist-0.8.7.0
+- heist-1.0.1.0
+- http-accept-0.2
+- logging-3.0.4
+- map-syntax-0.2.0.2
+- wai-session-clientsession-0.1
+- wai-util-0.8
+
+flags: {}
+
+extra-package-dbs: []

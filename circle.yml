@@ -7,9 +7,9 @@ dependencies:
     - "~/.stack"
     - "~/fn/.stack-work"
   pre:
-    - wget https://github.com/commercialhaskell/stack/releases/download/v0.1.6.0/stack-0.1.6.0-linux-x86_64.tar.gz -O /tmp/stack.tar.gz
+    - wget https://github.com/commercialhaskell/stack/releases/download/v1.1.2/stack-1.1.2-linux-x86_64.tar.gz -O /tmp/stack.tar.gz
     - tar xvzf /tmp/stack.tar.gz -C /tmp
-    - sudo mv /tmp/stack-0.1.6.0-linux-x86_64/stack /usr/bin/stack
+    - sudo mv /tmp/stack-1.1.2-linux-x86_64/stack /usr/bin/stack
   override:
     - stack setup --stack-yaml stack-7.8.yaml
     - stack setup --stack-yaml stack-7.10.yaml

@@ -98,11 +98,11 @@ heistInit templateLocations isplices csplices =
                                    & hcLoadTimeSplices .~ defaultLoadTimeSplices
                                    & hcCompiledSplices .~ csplices
                                    & hcNamespace .~ ""
-     #if MIN_VERSION_heist(1,0,0)
+#if MIN_VERSION_heist(1,0,0)
      initHeist config
-     #else
+#else
      runEitherT $ initHeist config
-     #endif
+#endif
 
 -- | Render interpreted templates according to the request path. Note
 -- that if you have matched some parts of the path, those will not be

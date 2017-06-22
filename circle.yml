@@ -7,22 +7,28 @@ dependencies:
     - "~/.stack"
     - "~/fn/.stack-work"
   pre:
-    - wget https://github.com/commercialhaskell/stack/releases/download/v0.1.6.0/stack-0.1.6.0-linux-x86_64.tar.gz -O /tmp/stack.tar.gz
+    - wget https://github.com/commercialhaskell/stack/releases/download/v1.1.2/stack-1.1.2-linux-x86_64.tar.gz -O /tmp/stack.tar.gz
     - tar xvzf /tmp/stack.tar.gz -C /tmp
-    - sudo mv /tmp/stack-0.1.6.0-linux-x86_64/stack /usr/bin/stack
+    - sudo mv /tmp/stack-1.1.2-linux-x86_64/stack /usr/bin/stack
   override:
-    - stack setup --stack-yaml stack-7.8.yaml
+    - stack setup --stack-yaml stack-8.15.yaml
     - stack setup --stack-yaml stack-7.10.yaml
-    - stack build --jobs=4 --stack-yaml stack-7.8.yaml
-    - stack test fn --no-run-tests --stack-yaml stack-7.8.yaml
-    - stack test fn-example --no-run-tests --stack-yaml stack-7.8.yaml
+    - stack setup --stack-yaml stack-7.8.yaml
+    - stack build --jobs=4 --stack-yaml stack-8.15.yaml
+    - stack test fn --no-run-tests --stack-yaml stack-8.15.yaml
+    - stack test fn-example --no-run-tests --stack-yaml stack-8.15.yaml
     - stack build --jobs=4 --stack-yaml stack-7.10.yaml
     - stack test fn --no-run-tests --stack-yaml stack-7.10.yaml
     - stack test fn-example --no-run-tests --stack-yaml stack-7.10.yaml
+    - stack build --jobs=4 --stack-yaml stack-7.8.yaml
+    - stack test fn --no-run-tests --stack-yaml stack-7.8.yaml
+    - stack test fn-example --no-run-tests --stack-yaml stack-7.8.yaml
 
 test:
   override:
-    - stack test fn --stack-yaml stack-7.8.yaml
-    - stack test fn-example --stack-yaml stack-7.8.yaml
+    - stack test fn --stack-yaml stack-8.15.yaml
+    - stack test fn-example --stack-yaml stack-8.15.yaml
     - stack test fn --stack-yaml stack-7.10.yaml
     - stack test fn-example --stack-yaml stack-7.10.yaml
+    - stack test fn --stack-yaml stack-7.8.yaml
+    - stack test fn-example --stack-yaml stack-7.8.yaml

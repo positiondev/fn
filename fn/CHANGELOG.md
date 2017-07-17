@@ -1,3 +1,10 @@
+* 0.3.0.2 Libby Horacek <libby@positiondev.com> 2017-6-13
+
+  - Update base dependencies to support GHC 8
+  - Add a stack.yml for 8.15
+
+* 0.3.0.1.1 David Hartunian <david@positiondev.com> 2017-6-30
+
   - Add okJson helper for returning JSON strings as text
 
 * 0.3.0.1 Daniel Patterson <dbp@dbpmail.net> 2016-3-11

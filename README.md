@@ -9,7 +9,7 @@ See the `example` directory for a full example, but a minimal
 application is the following:
 
 
-```
+```haskell
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 

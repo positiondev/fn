@@ -1,3 +1,8 @@
+* 0.3.0.2 Libby Horacek <libby@positiondev.com> 2017-7-17
+
+  - Don't send empty files to Digestive Functors.
+  - Add support for Heist 1.0 and above.
+
 * 0.3.0.1 Daniel Patterson <dbp@dbpmail.net> 2016-3-11
 
   - Change repository location, copyright.

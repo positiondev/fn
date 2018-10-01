@@ -1,3 +1,8 @@
+* 0.3.1 Libby Horacek <libby@positiondev.com> 2018-10-1
+
+ - Update Stack to LTS 12.11
+ - Stop supporting old version of Heist
+
 * 0.3.0.2 Libby Horacek <libby@positiondev.com> 2017-7-17
 
   - Don't send empty files to Digestive Functors.

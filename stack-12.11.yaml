@@ -1,0 +1,21 @@
+resolver: lts-12.11
+
+packages:
+- 'fn'
+- 'fn-extra'
+- 'example'
+
+extra-deps:
+- digestive-functors-0.8.4.0
+- digestive-functors-heist-0.8.8.1
+- heist-1.1
+- http-accept-0.2
+- logging-3.0.5
+- map-syntax-0.3
+- wai-session-clientsession-0.1
+- wai-util-0.8
+- xmlhtml-0.2.5.2
+
+flags: {}
+
+extra-package-dbs: []

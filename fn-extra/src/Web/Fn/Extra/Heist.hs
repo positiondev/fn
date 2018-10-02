@@ -44,6 +44,7 @@ import           Control.Arrow              (first)
 import           Control.Lens
 import           Control.Monad.State
 import           Data.Map.Syntax ((##))
+import           Data.Monoid
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T

@@ -1,7 +1,13 @@
+* 0.3.1 Libby Horacek <libby@positiondev.com> 2017-6-13
+
+  - Update base dependencies to support GHC 8.4
+  - Add a stack.yml for LTS 12.11
+  - Drop support for Stackage < 7 (mostly meaning Heist < 1.0)
+
 * 0.3.0.2 Libby Horacek <libby@positiondev.com> 2017-6-13
 
   - Update base dependencies to support GHC 8
-  - Add a stack.yml for 8.15
+  - Add a stack.yml for LTS 8.15
 
 * 0.3.0.1.1 David Hartunian <david@positiondev.com> 2017-6-30
 

@@ -135,6 +135,7 @@ class RequestContext ctxt where
   setRequest c r =
     let (Store _ b) = requestLens (`Store` id) c
     in b r
+  {-# MINIMAL requestLens | (getRequest, setRequest) #-}
 
 instance RequestContext FnRequest where
   getRequest = id

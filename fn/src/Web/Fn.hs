@@ -77,6 +77,7 @@ import qualified Data.ByteString.Lazy               as LB
 import           Data.Either                        (lefts, rights)
 import qualified Data.HashMap.Strict                as HM
 import           Data.Maybe                         (fromJust)
+import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as T
@@ -204,16 +205,28 @@ mimeMap =  HM.fromList [
   ( ".asc"     , "text/plain"                        ),
   ( ".asf"     , "video/x-ms-asf"                    ),
   ( ".asx"     , "video/x-ms-asf"                    ),
+  ( ".au"      , "audio/basic"                       ),
   ( ".avi"     , "video/x-msvideo"                   ),
+  ( ".bmp"     , "image/bmp"                         ),
   ( ".bz2"     , "application/x-bzip"                ),
   ( ".c"       , "text/plain"                        ),
   ( ".class"   , "application/octet-stream"          ),
   ( ".conf"    , "text/plain"                        ),
   ( ".cpp"     , "text/plain"                        ),
   ( ".css"     , "text/css"                          ),
+  ( ".csv"     , "text/csv"                          ),
   ( ".cxx"     , "text/plain"                        ),
-  ( ".dtd"     , "text/xml"                          ),
+  ( ".doc"     , "application/msword"                ),
+  ( ".docx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument"
+                    <>".wordprocessingml.document"   ),
+  ( ".dotx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument"
+                    <>".wordprocessingml.template"   ),
+  ( ".dtd"     , "application/xml-dtd"               ),
   ( ".dvi"     , "application/x-dvi"                 ),
+  ( ".exe"     , "application/octet-stream"          ),
+  ( ".flv"     , "video/x-flv"                       ),
   ( ".gif"     , "image/gif"                         ),
   ( ".gz"      , "application/x-gzip"                ),
   ( ".hs"      , "text/plain"                        ),
@@ -226,18 +239,37 @@ mimeMap =  HM.fromList [
   ( ".js"      , "text/javascript"                   ),
   ( ".json"    , "application/json"                  ),
   ( ".log"     , "text/plain"                        ),
+  ( ".m3u8"    , "application/x-mpegURL"             ),
   ( ".m3u"     , "audio/x-mpegurl"                   ),
+  ( ".mka"     , "audio/x-matroska"                  ),
+  ( ".mk3d"    , "video/x-matroska"                  ),
+  ( ".mkv"     , "video/x-matroska"                  ),
   ( ".mov"     , "video/quicktime"                   ),
   ( ".mp3"     , "audio/mpeg"                        ),
+  ( ".mp4"     , "video/mp4"                         ),
   ( ".mpeg"    , "video/mpeg"                        ),
   ( ".mpg"     , "video/mpeg"                        ),
   ( ".ogg"     , "application/ogg"                   ),
   ( ".pac"     , "application/x-ns-proxy-autoconfig" ),
   ( ".pdf"     , "application/pdf"                   ),
   ( ".png"     , "image/png"                         ),
+  ( ".potx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument"
+                    <>".presentationml.template"     ),
+  ( ".ppsx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument"
+                    <>".presentationml.slideshow"    ),
+  ( ".ppt"     , "application/vnd.ms-powerpoint"     ),
+  ( ".pptx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument"
+                    <>".presentationml.presentation" ),
   ( ".ps"      , "application/postscript"            ),
   ( ".qt"      , "video/quicktime"                   ),
+  ( ".rtf"     , "text/rtf"                          ),
   ( ".sig"     , "application/pgp-signature"         ),
+  ( ".sldx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument"
+                    <>".presentationml.slide"        ),
   ( ".spl"     , "application/futuresplash"          ),
   ( ".svg"     , "image/svg+xml"                     ),
   ( ".swf"     , "application/x-shockwave-flash"     ),
@@ -247,14 +279,29 @@ mimeMap =  HM.fromList [
   ( ".tbz"     , "application/x-bzip-compressed-tar" ),
   ( ".text"    , "text/plain"                        ),
   ( ".tgz"     , "application/x-tgz"                 ),
+  ( ".tif"     , "image/tiff"                        ),
+  ( ".tiff"    , "image/tiff"                        ),
   ( ".torrent" , "application/x-bittorrent"          ),
+  ( ".ts"      , "video/mp2t"                        ),
   ( ".ttf"     , "application/x-font-truetype"       ),
   ( ".txt"     , "text/plain"                        ),
   ( ".wav"     , "audio/x-wav"                       ),
   ( ".wax"     , "audio/x-ms-wax"                    ),
+  ( ".webm"    , "video/webm"                        ),
   ( ".wma"     , "audio/x-ms-wma"                    ),
   ( ".wmv"     , "video/x-ms-wmv"                    ),
   ( ".xbm"     , "image/x-xbitmap"                   ),
+  ( ".xlam"    , "application/vnd.ms-excel.addin"
+                    <>".macroEnabled.12"             ),
+  ( ".xls"     , "application/vnd.ms-excel"          ),
+  ( ".xlsb"    , "application/vnd.ms-excel.sheet"
+                    <>".binary.macroEnabled.12"      ),
+  ( ".xlsx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument.spreadsheetml"
+                    <>".sheet"                       ),
+  ( ".xltx"    , "application/vnd.openxmlformats"
+                    <>"-officedocument.spreadsheetml"
+                    <>".template"                    ),
   ( ".xml"     , "text/xml"                          ),
   ( ".xpm"     , "image/x-xpixmap"                   ),
   ( ".xwd"     , "image/x-xwindowdump"               ),

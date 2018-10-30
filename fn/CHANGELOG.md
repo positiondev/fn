@@ -1,3 +1,7 @@
+* 0.3.1.1 Tom Murphy <tom@tinybop.com> 2018-10-12
+
+  - Add MINIMAL pragma for RequestContext class
+
 * 0.3.1 Libby Horacek <libby@positiondev.com> 2017-6-13
 
   - Update base dependencies to support GHC 8.4

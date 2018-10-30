@@ -73,7 +73,7 @@ import           Control.Monad.Trans.Resource       (InternalState,
                                                      closeInternalState,
                                                      createInternalState)
 import           Data.ByteString                    (ByteString)
-import qualified Data.ByteString.Lazy               as LB
+import           Data.ByteString.Lazy               ()
 import           Data.Either                        (lefts, rights)
 import qualified Data.HashMap.Strict                as HM
 import           Data.Maybe                         (fromJust)
@@ -85,12 +85,10 @@ import           Data.Text.Read                     (decimal, double)
 import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Parse                  (FileInfo (..), Param,
-                                                     lbsBackEnd,
                                                      parseRequestBody)
 import qualified Network.Wai.Parse                  as Parse
 import           System.Directory                   (doesFileExist,
-                                                     getTemporaryDirectory,
-                                                     removeFile)
+                                                     getTemporaryDirectory)
 import           System.FilePath                    (takeExtension)
 
 data Store b a = Store b (b -> a)
@@ -374,6 +372,7 @@ type Req = (Request, [Text], Query, StdMethod, PostMVar)
 tempFileBackEnd' :: InternalState -> ignored1 -> FileInfo () -> IO ByteString -> IO FilePath
 tempFileBackEnd' is x fi@(FileInfo nm _ _) = Parse.tempFileBackEndOpts getTemporaryDirectory (T.unpack $ T.decodeUtf8 nm) is x fi
 
+readBody :: MVar (Maybe (([Param], [Parse.File FilePath]), InternalState)) -> Request -> IO ()
 readBody mv request =
   modifyMVar_ mv
     (\r -> case r of
@@ -503,6 +502,7 @@ findParamMatches n ps = fromParam .
                         filter ((== T.encodeUtf8 n) . fst) $
                         ps
 
+getMVarParams :: PostMVar -> IO [Param]
 getMVarParams mv = case mv of
                      Just mv' -> do v <- readMVar mv'
                                     return $ case v of
@@ -566,6 +566,7 @@ data File = File { fileName        :: Text
                  , filePath        :: FilePath
                  }
 
+getMVarFiles :: PostMVar -> Request -> IO [(Text, File)]
 getMVarFiles mv req =
   case mv of
     Nothing -> error $ "Fn: tried to read a 'file' or 'files', but FnRequest wasn't initialized with MVar."

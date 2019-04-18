@@ -1,0 +1,52 @@
+version: 2
+jobs:
+  build-and-test-job:
+    docker:
+      - image: haskell:8.4.3
+      - image: circleci/postgres:9.6
+        environment:
+          POSTGRES_USER: wayland_user
+          POSTGRES_PASSWORD: 111
+          POSTGRES_DB: wayland_test
+      - image: redis:2.8.23
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps-{{ checksum "~/project/fn/fn.cabal" }}-
+      - run:
+          name: Set up postgres and Stack 12.11 and 8.15
+          command: |
+            apt update
+            apt install -y libpq-dev
+            stack setup --stack-yaml stack-12.11.yaml
+            stack setup --stack-yaml stack-8.15.yaml
+      - save_cache:
+          key: deps-{{ checksum "~/project/fn/fn.cabal" }}-1
+          paths:
+            - ~/.stack
+            - ~/project/.stack-work
+      - run:
+          name: Build fn for both versions
+          command: |
+            stack build --jobs=1 --stack-yaml stack-12.11.yaml
+            stack build --jobs=1 --stack-yaml stack-8.15.yaml
+      - save_cache:
+          key: deps-{{ checksum "~/project/fn/fn.cabal" }}-3
+          paths:
+            - ~/.stack
+            - ~/project/.stack-work
+      - run:
+          name: Run tests fn for Stack 12.11
+          command: |
+            stack test fn --stack-yaml stack-12.11.yaml
+            stack test fn-example --stack-yaml stack-12.11.yaml
+      - run:
+          name: Run tests for Stack 8.15
+          command: |
+            stack test fn --stack-yaml stack-8.15.yaml
+            stack test fn-example --stack-yaml stack-8.15.yaml
+workflows:
+  version: 2
+  build-and-test:
+    jobs:
+      - build-and-test-job

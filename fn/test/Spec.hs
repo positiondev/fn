@@ -105,6 +105,8 @@ main = hspec $ do
     it "should match query parameters with param" $
       do v (param "foo" (q [("foo", Nothing)])) (t1 "")
          vn (param "foo" (q [])) t1u
+    it "should map invalid bytestring param values to Unicode replacement character" $
+         v (param "foo" (q [("foo", Just "bar\xc3")])) (t1 "bar\65533")
     it "should match combined param and paths with /?" $
       do v ((path "a" /? param "id") (_p ["a"] $ q [("id", Just "x")])) (t1 "x")
          vn ((path "a" /? param "id") (_p ["b"] $ q [("id", Just "x")])) t1u

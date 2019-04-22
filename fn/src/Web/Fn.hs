@@ -81,6 +81,7 @@ import           Data.Monoid                        ((<>))
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as T
+import qualified Data.Text.Encoding.Error           as T
 import           Data.Text.Read                     (decimal, double)
 import           Network.HTTP.Types
 import           Network.Wai
@@ -496,11 +497,12 @@ instance FromParam a => FromParam (Maybe a) where
   fromParam [] = Right Nothing
   fromParam _ = Left ParamTooMany
 
+-- Using "lenientDecode" means the text decoder will turn non-Unicode characters to
+-- the Unicode replacement character U+FFFD instead of just throwing an exception.
 findParamMatches :: FromParam p => Text -> [(ByteString, Maybe ByteString)] -> Either ParamError p
-findParamMatches n ps = fromParam .
-                        map (maybe "" T.decodeUtf8 . snd) .
-                        filter ((== T.encodeUtf8 n) . fst) $
-                        ps
+findParamMatches n = fromParam .
+                      map (maybe "" (T.decodeUtf8With T.lenientDecode) . snd) .
+                      filter ((== T.encodeUtf8 n) . fst)
 
 getMVarParams :: PostMVar -> IO [Param]
 getMVarParams mv = case mv of

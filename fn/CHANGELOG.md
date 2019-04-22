@@ -1,3 +1,11 @@
+* 0.4.0 Libby Horacek <libby@positiondev.com> 2019-4-18
+
+  - To get `Text` param values, we have to convert from `Bytestring`. If
+    the Bytestring isn't a valid Unicode character, `decodeUtf8` throws an
+    exception. Replaced `decodeUtf8` with `decodeUtf8With lenientDecode`, which
+    will instead replace the invalid character with the Unicode replacement
+    character U+FFFD.
+
 * 0.3.1.1 Tom Murphy <tom@tinybop.com> 2018-10-12
 
   - Add MINIMAL pragma for RequestContext class

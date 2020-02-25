@@ -2,7 +2,7 @@ version: 2
 jobs:
   build-and-test-job:
     docker:
-      - image: haskell:8.4.3
+      - image: haskell:8.8.1
       - image: circleci/postgres:9.6
         environment:
           POSTGRES_USER: wayland_user
@@ -18,6 +18,7 @@ jobs:
           command: |
             apt update
             apt install -y libpq-dev
+            stack setup --stack-yaml stack-15.1.yaml
             stack setup --stack-yaml stack-12.11.yaml
             stack setup --stack-yaml stack-8.15.yaml
       - save_cache:
@@ -35,6 +36,11 @@ jobs:
           paths:
             - ~/.stack
             - ~/project/.stack-work
+      - run:
+          name: Run tests fn for Stack 15.1
+          command: |
+            stack test fn --stack-yaml stack-15.1.yaml
+            stack test fn-example --stack-yaml stack-15.1.yaml
       - run:
           name: Run tests fn for Stack 12.11
           command: |

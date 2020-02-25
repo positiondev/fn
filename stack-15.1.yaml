@@ -1,0 +1,22 @@
+resolver: lts-15.1
+
+packages:
+- 'fn'
+- 'fn-extra'
+- 'example'
+
+extra-deps:
+- digestive-functors-0.8.4.0@sha256:eb2ce9e55a8d2f26a9f5c8386e0d764fe1ce47eb0430af84104bf12dab431fa9,3287
+- digestive-functors-heist-0.8.8.1@sha256:03b92ba8eac9b4d23f3a8ea4c18192210d54b80b89d03a35f35dd88f95d40ad9,1022
+- heist-1.1.0.1@sha256:7355cf8c1a7ef84c0c800c0539f7b99e7e540cace697238009a2dea1f05231f1,9311
+- logging-3.0.5@sha256:88096d3124fce9a19af3720f751e1a354d866ed5030d2e5197238d2277cdb2f2,2374
+- map-syntax-0.3@sha256:ca8b449615fa57419c16a5e98844624a6ac758692b87b3cfae8c74c87c56f1b2,2420
+- wai-session-clientsession-0.1@sha256:e5778e6a7bc67d2e91f44d9efe8de24cfb4181d3c5445195d0cc7167fbc6ad24,1223
+- wai-util-0.8@sha256:7181e748ccd405ecef5a586c954acb3d62b55b8eb7368efb5d80d6bf38e8211b,1260
+- xmlhtml-0.2.5.2@sha256:3f0990f725551985d777e8edb5563fe99aee998f1fde6a7633f720f76df54701,46997
+- http-accept-0.2@sha256:c55935f6ff4984aee96ebc130cc9aa6919d322becb613c049a81203cec9fe65e,1154
+- semigroups-0.18.5@sha256:41ef9f5f183f66c519c5cddcb3fbfdbc9b67a2b7bfae7d81f91de9ff7367d8c6,5828
+
+flags: {}
+
+extra-package-dbs: []

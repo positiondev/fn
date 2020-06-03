@@ -172,6 +172,8 @@ main = hspec $ do
   describe "parameter parsing" $
     do it "should parse Text" $
          fromParam ["hello"] `shouldBe` Right ("hello" :: Text)
+       it "should parse String" $
+         fromParam ["hello"] `shouldBe` Right ("hello" :: String)
        it "should parse Int" $
          do fromParam ["1"] `shouldBe` Right (1 :: Int)
             fromParam ["2011"] `shouldBe` Right (2011 :: Int)

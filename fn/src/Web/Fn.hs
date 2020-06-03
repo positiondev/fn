@@ -471,6 +471,10 @@ instance FromParam Text where
   fromParam [x] = Right x
   fromParam [] = Left ParamMissing
   fromParam _ = Left ParamTooMany
+instance {-# INCOHERENT #-} FromParam String where
+  fromParam [t] = Right (T.unpack t)
+  fromParam [] = Left ParamMissing
+  fromParam _ = Left ParamTooMany
 instance FromParam Int where
   fromParam [t] = case decimal t of
                     Left _ -> Left ParamUnparsable
